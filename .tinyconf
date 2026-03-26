@@ -1,0 +1,25 @@
+PROJECT src
+MAIN prism/src/main.c
+LIB prism/vendor/raylib/lib
+INCLUDE prism/vendor/raylib/include
+INCLUDE prism/vendor/stb_image/include
+INCLUDE prism/vendor/cglm/include
+INCLUDE prism/vendor/EasyC/include
+INCLUDE prism/vendor/suitesparse/include
+LINUX LINK vulkan
+LINUX LINK glfw
+LINUX LINK GLU
+LINUX LINK GL
+LINUX LINK pthread
+LINUX LINK m
+LINUX LINK cholmod
+LINUX LINK :linux_amdx64_libraylib.a
+SOURCE prism/vendor/EasyC/include
+INCLUDE prism/src
+SOURCE prism/src/core
+SOURCE prism/src/data
+SOURCE prism/src/renderer
+SOURCE prism/src/ui
+FLAG audit
+FLAG fast
+DEFINE EXTEND_PRISM
