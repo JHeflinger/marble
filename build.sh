@@ -26,6 +26,7 @@ if [ ! -d "penv" ]; then
     mkdir "penv"
     cp -r prism/assets penv/assets
     cp -r prism/shaders penv/shaders
+    cp -r resources penv/resources
     cd "penv"
     mkdir "build"
     cd ..

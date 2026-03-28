@@ -1,0 +1,3 @@
+1. variable viewport width
+2. scene viewer
+3. clean system that cleans all heap mem from existing needed components
