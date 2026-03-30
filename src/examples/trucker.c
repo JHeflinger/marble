@@ -7,6 +7,9 @@
 #include <renderer/renderer.h>
 #include <raymath.h>
 
+#define UNIQUE_CARS 3
+#define NUM_CARS 10
+
 typedef struct {
     Entity e;
     Vector3 offset;
@@ -15,9 +18,9 @@ typedef struct {
 } Vehicle;
 
 Entity g_timer;
-Entity g_basecars[3];
-float g_basescale[3] = { 0.25f, 0.25f, 0.375f };
-const char* g_basecarpaths[3] = { "resources/models/cars/car_1.obj", "resources/models/cars/car_2.obj", "resources/models/cars/car_3.obj" };
+Entity g_basecars[NUM_CARS];
+float g_basescale[UNIQUE_CARS] = { 0.25f, 0.25f, 0.375f };
+const char* g_basecarpaths[UNIQUE_CARS] = { "resources/models/cars/car_1.obj", "resources/models/cars/car_2.obj", "resources/models/cars/car_3.obj" };
 Vehicle g_player;
 
 void UpdateCar(Vehicle* v, float dt) {
@@ -45,7 +48,7 @@ void UpdateCar(Vehicle* v, float dt) {
     c.position[0] = c.look[0] + behind.x;
     c.position[1] = c.look[1] + behind.y;
     c.position[2] = c.look[2] + behind.z;
-    MoveCamera(c);
+    //MoveCamera(c);
 }
 
 void UpdateCoreScene(World* world, float dt) {
@@ -68,10 +71,12 @@ Scene* GenerateCoreScene() {
     g_player.force = (Vector3){ 0 };
 
     // base cars
-    for (int i = 0; i < 1; i++) {
-        g_basecars[i] = CreateEntityP(world, 0, 0, (i + 1)*5.0f);
-        *(EntityScale(g_basecars[i])) = (Vector3){ g_basescale[i], g_basescale[i], g_basescale[i] };
-        AddComponent(g_basecars[i], MeshComponent, UploadGeometry(g_basecarpaths[i]));
+    for (int i = 0; i < NUM_CARS; i++) {
+        size_t j = i%UNIQUE_CARS;
+        float radius = 10.0f;
+        g_basecars[i] = CreateEntityP(world, sin(i + 1) * radius, sin(i + 1) * radius * (rand()%2 == 0 ? -1.0f : 1.0f), cos(i + 1) * radius);
+        *(EntityScale(g_basecars[i])) = (Vector3){ g_basescale[j], g_basescale[j], g_basescale[j] };
+        AddComponent(g_basecars[i], MeshComponent, UploadGeometry(g_basecarpaths[j]));
         AddComponent(g_basecars[i], StaticCollisionComponent, 0, MESH_COLLIDER);
     }
 
