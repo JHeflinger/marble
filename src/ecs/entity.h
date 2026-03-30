@@ -29,4 +29,8 @@ Vector3* EntityScale(const Entity e);
 
 Vector3* EntityRotation(const Entity e);
 
+Matrix EntityTransform(const Entity e);
+
+Vector3 EntityOrient(const Entity e, Vector3 vector);
+
 #endif

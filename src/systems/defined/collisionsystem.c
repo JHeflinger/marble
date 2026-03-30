@@ -147,12 +147,7 @@ BOOL HandleSimplex(Simplex* simplex, Vector3* direction) {
 }
 
 Vector3 BoxSupport(Entity e, Vector3 direction) {
-    Matrix S = MatrixScale(EntityScale(e)->x, EntityScale(e)->y, EntityScale(e)->z);
-    Matrix R = MatrixMultiply(MatrixMultiply(MatrixRotateX(EntityRotation(e)->x),
-                                         MatrixRotateY(EntityRotation(e)->y)),
-                                         MatrixRotateZ(EntityRotation(e)->z));
-    Matrix T = MatrixTranslate(EntityPosition(e)->x, EntityPosition(e)->y, EntityPosition(e)->z);
-    Matrix model = MatrixMultiply(T, MatrixMultiply(R, S));
+    Matrix model = EntityTransform(e);
     Matrix invModel = MatrixInvert(model);
     Vector3 localDir = Vector3Transform(direction, invModel);
     Vector3 result = {
@@ -164,12 +159,7 @@ Vector3 BoxSupport(Entity e, Vector3 direction) {
 }
 
 Vector3 CylinderSupport(Entity e, Vector3 direction) {
-    Matrix S = MatrixScale(EntityScale(e)->x, EntityScale(e)->y, EntityScale(e)->z);
-    Matrix R = MatrixMultiply(MatrixMultiply(MatrixRotateX(EntityRotation(e)->x),
-                                         MatrixRotateY(EntityRotation(e)->y)),
-                                         MatrixRotateZ(EntityRotation(e)->z));
-    Matrix T = MatrixTranslate(EntityPosition(e)->x, EntityPosition(e)->y, EntityPosition(e)->z);
-    Matrix model = MatrixMultiply(T, MatrixMultiply(R, S));
+    Matrix model = EntityTransform(e);
     Matrix invModel = MatrixInvert(model);
     Vector3 localDir = Vector3Transform(direction, invModel);
     Vector2 radial = { localDir.x, localDir.z };
@@ -184,14 +174,10 @@ Vector3 SphereSupport(Entity e, Vector3 direction) {
 }
 
 Vector3 MeshSupport(Entity e, Vector3 direction) {
-    Matrix S = MatrixScale(EntityScale(e)->x, EntityScale(e)->y, EntityScale(e)->z);
-    Matrix R = MatrixMultiply(MatrixMultiply(MatrixRotateX(EntityRotation(e)->x),
-                                         MatrixRotateY(EntityRotation(e)->y)),
-                                         MatrixRotateZ(EntityRotation(e)->z));
-    Matrix T = MatrixTranslate(EntityPosition(e)->x, EntityPosition(e)->y, EntityPosition(e)->z);
-    Matrix model = MatrixMultiply(T, MatrixMultiply(R, S));
-    Matrix normalMatrix = MatrixTranspose(MatrixInvert(model));
-    Vector3 localDir = Vector3Transform(direction, normalMatrix);
+    Matrix model = EntityTransform(e);
+    Matrix RS = model;
+    RS.m12 = 0; RS.m13 = 0; RS.m14 = 0;
+    Vector3 localDir = Vector3Transform(direction, MatrixInvert(RS));
     MeshComponent* mc = GetComponent(e, MeshComponent);
     MeshDescriptor* md = MeshReference(mc->id);
     float bestDot = -FLT_MAX;
@@ -203,17 +189,15 @@ Vector3 MeshSupport(Entity e, Vector3 direction) {
         float d = Vector3DotProduct(vertex, localDir);
         if (d > bestDot) { bestDot = d; bestPoint = vertex; }
     }
-    return Vector3Transform(bestPoint, model);
+    return Vector3Add(Vector3Transform(bestPoint, RS), *EntityPosition(e));
 }
 
 void ApplyMTV(Entity e1, Entity e2, Vector3 mtv) {
-    BOOL e1Static = GetComponent(e1, StaticCollisionComponent) != NULL;
-    BOOL e2Static = GetComponent(e2, StaticCollisionComponent) != NULL;
-    if (e2Static) {
+    if (HasComponent(e2, StaticCollisionComponent)) {
         *EntityPosition(e1) = Vector3Add(*EntityPosition(e1), Vector3Scale(mtv, 2.0f));
         GetComponent(e1, DynamicCollisionComponent)->mtv =
             Vector3Add(GetComponent(e1, DynamicCollisionComponent)->mtv, Vector3Scale(mtv, 2.0f));
-    } else if (e1Static) {
+    } else if (HasComponent(e1, StaticCollisionComponent)) {
         *EntityPosition(e2) = Vector3Add(*EntityPosition(e2), Vector3Scale(mtv, 2.0f));
         GetComponent(e2, DynamicCollisionComponent)->mtv =
             Vector3Add(GetComponent(e2, DynamicCollisionComponent)->mtv, Vector3Scale(mtv, 2.0f));
