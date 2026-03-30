@@ -23,3 +23,15 @@ Vector3* EntityPosition(const Entity e) {
     TransformComponent* tc = GetComponent(e, TransformComponent);
     return &(tc->translation);
 }
+
+Vector3* EntityScale(const Entity e) {
+    EZ_ASSERT(HasComponent(e, TransformComponent), "Entity does not have transform component!");
+    TransformComponent* tc = GetComponent(e, TransformComponent);
+    return &(tc->scale);
+}
+
+Vector3* EntityRotation(const Entity e) {
+    EZ_ASSERT(HasComponent(e, TransformComponent), "Entity does not have transform component!");
+    TransformComponent* tc = GetComponent(e, TransformComponent);
+    return &(tc->rotation);
+}

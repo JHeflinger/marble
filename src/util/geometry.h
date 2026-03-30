@@ -3,11 +3,6 @@
 
 #include <renderer/rstructs.h>
 
-typedef struct {
-    VertexID start;
-    VertexID end;
-} MeshDescriptor;
-
-MeshDescriptor UploadGeometry(const char* filepath);
+size_t UploadGeometry(const char* filepath);
 
 #endif

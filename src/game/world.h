@@ -35,6 +35,8 @@ World* GenerateWorld(
 
 Entity CreateEntity(World* world);
 
+Entity CreateEntityP(World* world, float x, float y, float z);
+
 void AddSystem(World* world, System* system);
 
 void DestroyWorld(World* world);

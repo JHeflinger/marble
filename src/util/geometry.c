@@ -2,10 +2,7 @@
 #include <renderer/loader.h>
 #include <renderer/renderer.h>
 
-MeshDescriptor UploadGeometry(const char* filepath) {
-    VertexID start = NumVertices();
-    if (!LoadOBJ(filepath)) return (MeshDescriptor){ 0, 0 };
-    vec3 offsetv = { 0 };
-    SubmitVertex(offsetv);
-    return (MeshDescriptor){ start, NumVertices() - 1 };
+size_t UploadGeometry(const char* filepath) {
+    if (!LoadOBJ(filepath)) return (size_t)-1;
+    return NumMeshes() - 1;
 }

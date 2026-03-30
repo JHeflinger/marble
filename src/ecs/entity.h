@@ -25,4 +25,8 @@ void EntityRemoveComponent(const Entity e, size_t type);
 
 Vector3* EntityPosition(const Entity e);
 
+Vector3* EntityScale(const Entity e);
+
+Vector3* EntityRotation(const Entity e);
+
 #endif

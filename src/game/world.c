@@ -24,7 +24,15 @@ World* GenerateWorld(
 
 Entity CreateEntity(World* world) {
     Entity e = (Entity){ RegistryCreateEntity(world->registry), world };
-    AddComponent(e, TransformComponent);
+    Vector3 zero = (Vector3){ 0 };
+    Vector3 one = (Vector3){ 1.0f, 1.0f, 1.0f };
+    AddComponent(e, TransformComponent, zero, zero, one);
+    return e;
+}
+
+Entity CreateEntityP(World* world, float x, float y, float z) {
+    Entity e = CreateEntity(world);
+    *(EntityPosition(e)) = (Vector3){ x, y, z };
     return e;
 }
 

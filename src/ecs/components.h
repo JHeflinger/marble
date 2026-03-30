@@ -24,6 +24,13 @@ typedef enum {
     ABSOLUTE_ANCHOR
 } ViewportAnchor;
 
+typedef enum {
+    BOX_COLLIDER,
+    SPHERE_COLLIDER,
+    CYLINDER_COLLIDER,
+    MESH_COLLIDER
+} Collider;
+
 EXPOSE_COMPONENT(TagComponent) {
     const char* tag;
 };
@@ -43,7 +50,18 @@ EXPOSE_COMPONENT(TextComponent) {
 };
 
 EXPOSE_COMPONENT(MeshComponent) {
-    MeshDescriptor mesh;
+    size_t id;
+};
+
+EXPOSE_COMPONENT(DynamicCollisionComponent) {
+    BOOL collided;
+    Vector3 mtv;
+    Collider collider;
+};
+
+EXPOSE_COMPONENT(StaticCollisionComponent) {
+    BOOL collided;
+    Collider collider;
 };
 
 #endif

@@ -62,6 +62,25 @@ void DrawTextComponent(Entity e, Vector2 origin) {
 }
 
 void DrawDrawSystem(System* system) {
+    ARRLIST_EntityID* mesh_entities = GetEntities(system->context, MeshComponent);
+    if (mesh_entities) {
+        for (size_t i =0 ; i < mesh_entities->size; i++) {
+            Entity e = (Entity){ mesh_entities->data[i], system->context };
+            TransformComponent* tc = GetComponent(e, TransformComponent);
+            MeshComponent* mc = GetComponent(e, MeshComponent);
+            MeshDescriptor* md = MeshReference(mc->id);
+            md->translate[0] = tc->translation.x;
+            md->translate[1] = tc->translation.y;
+            md->translate[2] = tc->translation.z;
+            md->rotate[0] = tc->rotation.x;
+            md->rotate[1] = tc->rotation.y;
+            md->rotate[2] = tc->rotation.z;
+            md->scale[0] = tc->scale.x;
+            md->scale[1] = tc->scale.y;
+            md->scale[2] = tc->scale.z;
+            UpdateObjectTransform(mc->id);
+        }
+    }
     Render();
     RenderTexture2D target = GetViewportTarget();
     Vector2 slice = GetViewportSlice();
