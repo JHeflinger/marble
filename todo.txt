@@ -1,3 +1,4 @@
 1. variable viewport width
 2. scene viewer
 3. clean system that cleans all heap mem from existing needed components
+4. refit every frame, rebuild every N frames for BVH acceleration

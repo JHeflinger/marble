@@ -8,7 +8,7 @@
 #include <raymath.h>
 
 #define UNIQUE_CARS 3
-#define NUM_CARS 10
+#define NUM_CARS 80
 
 typedef struct {
     Entity e;
@@ -73,8 +73,9 @@ Scene* GenerateCoreScene() {
     // base cars
     for (int i = 0; i < NUM_CARS; i++) {
         size_t j = i%UNIQUE_CARS;
-        float radius = 10.0f;
-        g_basecars[i] = CreateEntityP(world, sin(i + 1) * radius, sin(i + 1) * radius * (rand()%2 == 0 ? -1.0f : 1.0f), cos(i + 1) * radius);
+        float radius = 10.0f + i;
+        float pct = ((float)i / (float)NUM_CARS) * M_PI * 2.0f;
+        g_basecars[i] = CreateEntityP(world, sin(pct) * radius, sin(pct) * radius * (rand()%2 == 0 ? -1.0f : 1.0f), cos(pct) * radius);
         *(EntityScale(g_basecars[i])) = (Vector3){ g_basescale[j], g_basescale[j], g_basescale[j] };
         AddComponent(g_basecars[i], MeshComponent, UploadGeometry(g_basecarpaths[j]));
         AddComponent(g_basecars[i], StaticCollisionComponent, 0, MESH_COLLIDER);
