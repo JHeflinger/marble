@@ -5,12 +5,13 @@
 IMPL_ARRLIST_NAMED(WorldPtr, World*);
 
 World* GenerateWorld(
-        DrawFunction draw,
-        UpdateFunction update,
-        KeyEventFunction key,
-        MouseButtonEventFunction mousebutton,
-        MouseScrollEventFunction mousescroll,
-        MouseMoveFunction mousemove) {
+        WorldDrawFunction draw,
+        WorldUpdateFunction update,
+        WorldKeyEventFunction key,
+        WorldMouseButtonEventFunction mousebutton,
+        WorldMouseScrollEventFunction mousescroll,
+        WorldMouseMoveFunction mousemove,
+        WorldCleanFunction clean) {
     World* world = EZ_ALLOC(1, sizeof(World));
     world->draw = draw;
     world->update = update;
@@ -18,6 +19,7 @@ World* GenerateWorld(
     world->mousebutton = mousebutton;
     world->mousescroll = mousescroll;
     world->mousemove = mousemove;
+    world->clean = clean;
     world->registry = GenerateRegistry();
     return world;
 }
@@ -42,6 +44,7 @@ void AddSystem(World* world, System* system) {
 }
 
 void DestroyWorld(World* world) {
+    if (world->clean) world->clean(world);
     for (size_t i = 0; i < world->systems.size; i++)
         DestroySystem(world->systems.data[i]);
     ARRLIST_SystemPtr_clear(&world->systems);

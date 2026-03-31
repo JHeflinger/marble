@@ -1,7 +1,9 @@
 #include "collisionsystem.h"
 #include "ecs/components.h"
+#include "util/spacegrid.h"
 #include "ecs/entity.h"
 #include "game/world.h"
+#include "util/bvh.h"
 #include <renderer/renderer.h>
 #include <raymath.h>
 
@@ -9,6 +11,10 @@
 #define MAX_FACES     384  // 3x polytope
 #define MAX_NORMALS   128
 #define MAX_EDGES     128
+
+ARRLIST_NodeBVH g_bvh = { 0 };
+HASHMAP_GridMap g_sgrid = { 0 };
+uint64_t g_iterations = 0;
 
 typedef struct {
     Vector3 points[4];
@@ -524,6 +530,7 @@ BOOL DispatchCollision(Entity e1, Collider c1, Entity e2, Collider c2) {
 void UpdateCollisionSystem(System* system, float dt) {
     ARRLIST_EntityID* dynamics = GetEntities(system->context, DynamicCollisionComponent);
     ARRLIST_EntityID* statics = GetEntities(system->context, StaticCollisionComponent);
+    if (statics) ReconstructBVH(&g_bvh, *statics, system->context);
     if (dynamics) {
         for (size_t i = 0; i < dynamics->size; i++) {
             Entity e = (Entity){ dynamics->data[i], system->context };
@@ -533,28 +540,18 @@ void UpdateCollisionSystem(System* system, float dt) {
         }
         for (size_t i = 0; i < dynamics->size; i++) {
             Entity ei = (Entity){ dynamics->data[i], system->context };
-            DynamicCollisionComponent* dci = GetComponent(ei, DynamicCollisionComponent);
-            for (size_t j = i + 1; j < dynamics->size; j++) {
-                Entity ej = (Entity){ dynamics->data[j], system->context };
-                DynamicCollisionComponent* dcj = GetComponent(ej, DynamicCollisionComponent);
-                if (DispatchCollision(ei, dci->collider, ej, dcj->collider)) {
-                    dci->collided = TRUE;
-                    dcj->collided = TRUE;
-                }
-            }
-            if (statics) {
-                for (size_t j = 0; j < statics->size; j++) {
-                    Entity ej = (Entity){ statics->data[j], system->context };
-                    StaticCollisionComponent* scj = GetComponent(ej, StaticCollisionComponent);
-                    if (DispatchCollision(ei, dci->collider, ej, scj->collider)) {
-                        dci->collided = TRUE;
-                    }
-                }
-            }
+            QuerySpaceGrid(&g_sgrid, g_iterations, ei, DispatchCollision);
+            if (statics) QueryBVH(&g_bvh, ei, DispatchCollision);
         }
     }
+    g_iterations++;
+}
+
+void CleanCollisionSystem(System* system) {
+    ARRLIST_NodeBVH_clear(&g_bvh);
+    HASHMAP_GridMap_clear(&g_sgrid);
 }
 
 System* GenerateCollisionSystem() {
-    return GenerateSystem(NULL, UpdateCollisionSystem, NULL, NULL, NULL, NULL);
+    return GenerateSystem(NULL, UpdateCollisionSystem, NULL, NULL, NULL, NULL, CleanCollisionSystem);
 }

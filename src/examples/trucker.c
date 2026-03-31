@@ -57,7 +57,7 @@ void UpdateCoreScene(World* world, float dt) {
 
 Scene* GenerateCoreScene() {
     Scene* scene = GenerateScene("Core");
-    World* world = GenerateWorld(NULL, UpdateCoreScene, NULL, NULL, NULL, NULL);
+    World* world = GenerateWorld(NULL, UpdateCoreScene, NULL, NULL, NULL, NULL, NULL);
     AddWorld(scene, world);
     AddSystem(world, GenerateDrawSystem());
     AddSystem(world, GenerateCollisionSystem());
@@ -78,7 +78,8 @@ Scene* GenerateCoreScene() {
         g_basecars[i] = CreateEntityP(world, sin(pct) * radius, sin(pct) * radius * (rand()%2 == 0 ? -1.0f : 1.0f), cos(pct) * radius);
         *(EntityScale(g_basecars[i])) = (Vector3){ g_basescale[j], g_basescale[j], g_basescale[j] };
         AddComponent(g_basecars[i], MeshComponent, UploadGeometry(g_basecarpaths[j]));
-        AddComponent(g_basecars[i], StaticCollisionComponent, 0, MESH_COLLIDER);
+        //AddComponent(g_basecars[i], StaticCollisionComponent, 0, MESH_COLLIDER);
+        AddComponent(g_basecars[i], DynamicCollisionComponent, 0, { 0 }, MESH_COLLIDER);
     }
 
     // timer
@@ -97,7 +98,7 @@ void TitleSceneKeyEvent(World* world, int key, InputAction action) {
 
 Scene* GenerateTitleScene() {
     Scene* scene = GenerateScene("Title");
-    World* world = GenerateWorld(NULL, NULL, TitleSceneKeyEvent, NULL, NULL, NULL);
+    World* world = GenerateWorld(NULL, NULL, TitleSceneKeyEvent, NULL, NULL, NULL, NULL);
     AddWorld(scene, world);
     AddSystem(world, GenerateDrawSystem());
     AddComponent(CreateEntity(world), TextComponent, "Press \"P\" To Play!", TEXT_ALIGN_CENTER, CENTER_ANCHOR, WHITE, 20.0f);

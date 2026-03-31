@@ -2,3 +2,5 @@
 2. scene viewer
 3. clean system that cleans all heap mem from existing needed components
 4. refit every frame, rebuild every N frames for BVH acceleration
+5. maybe every x interations, clear the spacegrid hashmap to conserve memory?
+6. hashmap and arrlist of collided enemies in collision components - right now mtv is too much bc being applied multiple times over grid in dvd collisions

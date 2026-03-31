@@ -9,7 +9,8 @@ System* GenerateSystem(
         SystemKeyEventFunction key,
         SystemMouseButtonEventFunction mousebutton,
         SystemMouseScrollEventFunction mousescroll,
-        SystemMouseMoveFunction mousemove) {
+        SystemMouseMoveFunction mousemove,
+        SystemCleanFunction clean) {
     System* system = EZ_ALLOC(1, sizeof(System));
     system->draw = draw;
     system->update = update;
@@ -17,9 +18,11 @@ System* GenerateSystem(
     system->mousebutton = mousebutton;
     system->mousescroll = mousescroll;
     system->mousemove = mousemove;
+    system->clean = clean;
     return system;
 }
 
 void DestroySystem(System* system) {
+    if (system->clean) system->clean(system);
     EZ_FREE(system);
 }

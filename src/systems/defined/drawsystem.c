@@ -98,5 +98,5 @@ void DrawDrawSystem(System* system) {
 }
 
 System* GenerateDrawSystem() {
-    return GenerateSystem(DrawDrawSystem, NULL, NULL, NULL, NULL, NULL);
+    return GenerateSystem(DrawDrawSystem, NULL, NULL, NULL, NULL, NULL, NULL);
 }

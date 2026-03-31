@@ -11,6 +11,7 @@ typedef void (*SystemKeyEventFunction)(System* system, int key, InputAction acti
 typedef void (*SystemMouseButtonEventFunction)(System* system, int key, InputAction action);
 typedef void (*SystemMouseScrollEventFunction)(System* system, Vector2 offset);
 typedef void (*SystemMouseMoveFunction)(System* system, Vector2 position);
+typedef void (*SystemCleanFunction)(System* system);
 
 struct System {
     SystemDrawFunction draw;
@@ -19,6 +20,7 @@ struct System {
     SystemMouseButtonEventFunction mousebutton;
     SystemMouseScrollEventFunction mousescroll;
     SystemMouseMoveFunction mousemove;
+    SystemCleanFunction clean;
     World* context;
 };
 DECLARE_ARRLIST_NAMED(SystemPtr, System*);
@@ -29,7 +31,8 @@ System* GenerateSystem(
         SystemKeyEventFunction key,
         SystemMouseButtonEventFunction mousebutton,
         SystemMouseScrollEventFunction mousescroll,
-        SystemMouseMoveFunction mousemove);
+        SystemMouseMoveFunction mousemove,
+        SystemCleanFunction clean);
 
 void DestroySystem(System* system);
 
