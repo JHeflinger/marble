@@ -8,7 +8,7 @@
 #include <raymath.h>
 
 #define UNIQUE_CARS 3
-#define NUM_CARS 80
+#define NUM_CARS 1
 
 typedef struct {
     Entity e;

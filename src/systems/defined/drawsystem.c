@@ -64,7 +64,7 @@ void DrawTextComponent(Entity e, Vector2 origin) {
 void DrawDrawSystem(System* system) {
     ARRLIST_EntityID* mesh_entities = GetEntities(system->context, MeshComponent);
     if (mesh_entities) {
-        for (size_t i =0 ; i < mesh_entities->size; i++) {
+        for (size_t i = 0 ; i < mesh_entities->size; i++) {
             Entity e = (Entity){ mesh_entities->data[i], system->context };
             TransformComponent* tc = GetComponent(e, TransformComponent);
             MeshComponent* mc = GetComponent(e, MeshComponent);
