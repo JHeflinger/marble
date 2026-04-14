@@ -161,6 +161,7 @@ void InitializeApplication(const char* name, const char* goodbye) {
     #ifndef PROD_BUILD
     g_application.memory = EZ_ALLOCATED();
     #endif
+    OverrideResolution(400, 225);
     g_application.name = name;
     g_application.goodbye = goodbye;
 	SetTraceLogLevel(LOG_NONE);
