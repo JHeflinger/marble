@@ -12,5 +12,6 @@ typedef enum {
 FORWARD_DECLARE(World);
 FORWARD_DECLARE(Entity);
 FORWARD_DECLARE(System);
+FORWARD_DECLARE(BehaviorNode);
 
 #endif

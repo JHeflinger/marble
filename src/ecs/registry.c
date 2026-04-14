@@ -86,6 +86,18 @@ void CleanComponents(Registry* registry) {
             }
         }
     }
+
+    // AIComponent
+    {
+        ARRLIST_EntityID* ai = RegistryGetEntities(registry, AIComponent_TYPE);
+        if (ai) {
+            for (size_t i = 0; i < ai->size; i++) {
+                AIComponent* ac = RegistryGetComponent(registry, ai->data[i], AIComponent_TYPE);
+                if (ac->root) DestroyBehavior(ac->root);
+                HASHMAP_BlackBoard_clear(&(ac->blackboard.map));
+            }
+        }
+    }
 }
 
 void DestroyRegistry(Registry* registry) {
