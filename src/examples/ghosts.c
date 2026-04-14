@@ -33,7 +33,7 @@ Scene* GenerateMazeScene() {
 
     // maze
     g_maze = CreateEntity(world);
-    //AddComponent(g_maze, MeshComponent, UploadGeometry("resources/models/maze/maze.obj"));
+    AddComponent(g_maze, MeshComponent, UploadGeometry("resources/models/maze/maze.obj"));
 
     // lights
     LightID l1 = SubmitLight((SceneLight){{ 0 }, { 1, 1, 1 }, { 0, -1.0f, 0 }, 0, 0 });
