@@ -2,6 +2,7 @@
 #define COMPONENTS_H
 
 #include "util/geometry.h"
+#include "util/navigation.h"
 
 #define EXPOSE_COMPONENT(name) enum { name##_TYPE = __COUNTER__ }; struct name; typedef struct name name; struct name
 
@@ -62,6 +63,15 @@ EXPOSE_COMPONENT(DynamicCollisionComponent) {
 EXPOSE_COMPONENT(StaticCollisionComponent) {
     BOOL collided;
     Collider collider;
+};
+
+EXPOSE_COMPONENT(LightComponent) {
+    LightID id;
+};
+
+EXPOSE_COMPONENT(NavigationComponent) {
+    NavigationMesh mesh;
+    ARRLIST_size_t path;
 };
 
 #endif

@@ -1,6 +1,8 @@
 #include "examples/trucker.h"
+#include "examples/ghosts.h"
 
 int main(int argc, char** argv) {
-    TruckerMain();
+    //TruckerMain();
+    GhostsMain();
     return 0;
 }

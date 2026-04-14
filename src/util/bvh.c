@@ -1,6 +1,5 @@
 #include "bvh.h"
 #include "game/world.h"
-#include <renderer/renderer.h>
 #include <renderer/rmath.h>
 #include <easylogger.h>
 

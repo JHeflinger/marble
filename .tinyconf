@@ -21,5 +21,4 @@ SOURCE prism/src/data
 SOURCE prism/src/renderer
 SOURCE prism/src/ui
 FLAG audit
-FLAG fast
 DEFINE EXTEND_PRISM

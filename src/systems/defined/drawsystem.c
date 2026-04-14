@@ -62,6 +62,7 @@ void DrawTextComponent(Entity e, Vector2 origin) {
 }
 
 void DrawDrawSystem(System* system) {
+    RenderConfig()->reset = TRUE;
     ARRLIST_EntityID* mesh_entities = GetEntities(system->context, MeshComponent);
     if (mesh_entities) {
         for (size_t i = 0 ; i < mesh_entities->size; i++) {
@@ -81,6 +82,7 @@ void DrawDrawSystem(System* system) {
             UpdateObjectTransform(mc->id);
         }
     }
+    UpdateLights();
     Render();
     RenderTexture2D target = GetViewportTarget();
     Vector2 slice = GetViewportSlice();

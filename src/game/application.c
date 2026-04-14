@@ -136,6 +136,27 @@ void DrawApplication() {
     DrawUI(g_application.ui, 0, 0, GetScreenWidth(), GetScreenHeight());
 }
 
+void InitializeEngineMaterials() {
+    SubmitNamedMaterial((SurfaceMaterial){
+        {0.0f, 0.0f, 0.0f},
+        {0.0f, 1.0f, 0.0f},
+        {0.0f, 1.0f, 0.0f},
+        {0.0f, 0.0f, 0.0f},
+        {0.0f, 0.0f, 0.0f},
+        {0.0f, 0.0f, 0.0f},
+        0, 10.0f, 2
+    }, "Navigation Mesh");
+    SubmitNamedMaterial((SurfaceMaterial){
+        {0.0f, 0.0f, 0.0f},
+        {1.0f, 0.0f, 0.0f},
+        {1.0f, 0.0f, 0.0f},
+        {0.0f, 0.0f, 0.0f},
+        {0.0f, 0.0f, 0.0f},
+        {0.0f, 0.0f, 0.0f},
+        0, 10.0f, 2
+    }, "Attention");
+}
+
 void InitializeApplication(const char* name, const char* goodbye) {
     #ifndef PROD_BUILD
     g_application.memory = EZ_ALLOCATED();
@@ -149,6 +170,7 @@ void InitializeApplication(const char* name, const char* goodbye) {
     InitializeColors();
     InitializeAssets();
     InitializeRenderer();
+    InitializeEngineMaterials();
     g_application.ui = GenerateUI();
     g_application.ui->left = GenerateUI();
     g_application.ui->right = GenerateUI();

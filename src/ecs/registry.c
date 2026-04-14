@@ -1,4 +1,5 @@
 #include "registry.h"
+#include "ecs/components.h"
 #include <easyhash.h>
 
 IMPL_ARRLIST(EntityID);
@@ -73,7 +74,22 @@ ARRLIST_EntityID* RegistryGetEntities(Registry* registry, size_t type) {
     return &(HASHMAP_StorageMap_get(&registry->storage, type)->entities);
 }
 
+void CleanComponents(Registry* registry) {
+    // NavigationComponent
+    {
+        ARRLIST_EntityID* navmeshes = RegistryGetEntities(registry, NavigationComponent_TYPE);
+        if (navmeshes) {
+            for (size_t i = 0; i < navmeshes->size; i++) {
+                NavigationComponent* nc = RegistryGetComponent(registry, navmeshes->data[i], NavigationComponent_TYPE);
+                if (nc->mesh.polycount != 0) EZ_FREE(nc->mesh.polys);
+                ARRLIST_size_t_clear(&(nc->path));
+            }
+        }
+    }
+}
+
 void DestroyRegistry(Registry* registry) {
+    CleanComponents(registry);
     HASHMAP_StorageMap_clear(&registry->storage);
     for (size_t i = 0; i < registry->dense.size; i++) {
         for (size_t j = 0; j < registry->dense.data[i]->dense.size; j++)

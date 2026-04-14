@@ -106,7 +106,7 @@ Scene* GenerateTitleScene() {
 }
 
 void TruckerMain() {
-    InitializeApplication("Basic Game", "See you, Space Cowboy");
+    InitializeApplication("Trucker Example", "See you, Space Cowboy");
     AddScene(GenerateTitleScene());
     AddScene(GenerateScene("Win"));
     SetScene("Title");
