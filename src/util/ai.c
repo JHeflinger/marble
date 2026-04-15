@@ -87,7 +87,7 @@ float BlackBoardGetFloat(BlackBoard* board, const char* key) {
     return val.value._float;
 }
 
-BOOL BlackBoardGetBOOL(BlackBoard* board, const char* key) {
+BOOL BlackBoardGetBool(BlackBoard* board, const char* key) {
     BlackBoardValue val = BlackBoardGet(board, key);
     EZ_ASSERT(val.type == BB_BOOL, "BlackBoard value was requested to be a bool but was not of that type");
     return val.value._bool;

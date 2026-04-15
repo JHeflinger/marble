@@ -1,9 +1,9 @@
 #ifndef NAVIGATION_H
 #define NAVIGATION_H
 
+#include "ecs/entity.h"
 #include <stddef.h>
 #include <renderer/renderer.h>
-#include <easybasics.h>
 
 typedef struct {
     VertexID verts[3];
@@ -21,6 +21,10 @@ typedef struct {
 
 NavigationMesh UploadNavigationMesh(const char* filepath);
 
+NavigationMesh DuplicateNavigationMesh(NavigationMesh mesh);
+
 void FindPath(NavigationMesh* mesh, Vector3 start, Vector3 end, ARRLIST_size_t* path);
+
+void Navigate(Entity e, Vector3 target);
 
 #endif

@@ -1,4 +1,5 @@
 #include "navigation.h"
+#include "ecs/components.h"
 #include "util/geometry.h"
 #include "util/astar.h"
 #include <easyhash.h>
@@ -95,16 +96,11 @@ NavigationMesh UploadNavigationMesh(const char* filepath) {
     return nm;
 }
 
-void poop(size_t start, AStarConfig cfg, ARRLIST_size_t* path) {
-    for (size_t i = 0; i < path->size; i++) {
-        if (path->data[i] == start) return;
-    }
-    ARRLIST_size_t_add(path, start);
-    size_t boom[20] = { 0 };
-    size_t neighbors = NavigationNeighbors(start, boom, 3, cfg.ctx);
-    for (size_t i = 0; i < neighbors; i++) {
-        poop(boom[i], cfg, path);
-    }
+NavigationMesh DuplicateNavigationMesh(NavigationMesh mesh) {
+    NavigationMesh nm = mesh;
+    nm.polys = EZ_ALLOC(nm.polycount, sizeof(NavPoly));
+    memcpy(nm.polys, mesh.polys, nm.polycount * sizeof(NavPoly));
+    return nm;
 }
 
 void FindPath(NavigationMesh* mesh, Vector3 start, Vector3 end, ARRLIST_size_t* path) {
@@ -138,10 +134,18 @@ void FindPath(NavigationMesh* mesh, Vector3 start, Vector3 end, ARRLIST_size_t* 
         }
     }
     AStar(s, e, &cfg, path);
-    //ARRLIST_size_t_clear(path);
-    //poop(s, cfg, path);
     if (path->size == 0) {
         ARRLIST_size_t_add(path, s);
         ARRLIST_size_t_add(path, e);
     }
+}
+
+void Navigate(Entity e, Vector3 target) {
+    EZ_ASSERT(HasComponent(e, NavigationComponent), "Cannot perform navigation on an entity without a navigation component");
+    NavigationComponent* nc = GetComponent(e, NavigationComponent);
+    FindPath(
+        &(nc->mesh),
+        *(EntityPosition(e)),
+        target,
+        &(nc->path));
 }

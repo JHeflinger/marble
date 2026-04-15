@@ -62,7 +62,7 @@ int BlackBoardGetInt(BlackBoard* board, const char* key);
 
 float BlackBoardGetFloat(BlackBoard* board, const char* key);
 
-BOOL BlackBoardGetBOOL(BlackBoard* board, const char* key);
+BOOL BlackBoardGetBool(BlackBoard* board, const char* key);
 
 void* BlackBoardGetPointer(BlackBoard* board, const char* key);
 
