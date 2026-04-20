@@ -2,15 +2,19 @@ PROJECT src
 MAIN prism/src/main.c
 LIB prism/vendor/raylib/lib
 LIB prism/vendor/assimp/lib
+WINDOWS LIB prism/platform/windows/vulkan/libs
+WINDOWS LIB prism/platform/windows/GLFW
 INCLUDE prism/vendor/raylib/include
 INCLUDE prism/vendor/stb_image/include
 INCLUDE prism/vendor/cglm/include
 INCLUDE prism/vendor/EasyC/include
 INCLUDE prism/vendor/suitesparse/include
 INCLUDE prism/vendor/assimp/include
+WINDOWS INCLUDE prism/platform/windows/vulkan/include
+WINDOWS INCLUDE prism/platform/windows/GLFW/include
 LINK stdc++
-LINUX LINK z
-LINUX LINK :libassimp.a
+LINK z
+LINUX LINK :linux_libassimp.a
 LINUX LINK vulkan
 LINUX LINK glfw
 LINUX LINK GLU
@@ -19,6 +23,16 @@ LINUX LINK pthread
 LINUX LINK m
 LINUX LINK cholmod
 LINUX LINK :linux_amdx64_libraylib.a
+WINDOWS LINK :win_libassimp.a
+WINDOWS LINK vulkan-1
+WINDOWS LINK shell32
+WINDOWS LINK user32
+WINDOWS LINK opengl32
+WINDOWS LINK gdi32
+WINDOWS LINK winmm
+WINDOWS LINK winpthread
+WINDOWS LINK ws2_32
+WINDOWS LINK :win_x64_libraylib.a
 SOURCE prism/vendor/EasyC/include
 INCLUDE prism/src
 SOURCE prism/src/core
@@ -27,3 +41,4 @@ SOURCE prism/src/renderer
 SOURCE prism/src/ui
 FLAG audit
 DEFINE EXTEND_PRISM
+DEFINE NO_MESH_MANIPULATION_SUPPORT
