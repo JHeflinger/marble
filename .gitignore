@@ -1,3 +1,5 @@
 build/
 .scache/*
 penv/
+.idea
+cmake-build-debug/
