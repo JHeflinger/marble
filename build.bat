@@ -27,9 +27,9 @@ if NOT exist "prism\src\" (
 :: set up running env
 if NOT exist "penv" (
     mkdir "penv"
-    xcopy prism/assets penv/assets /E /I
-    xcopy prism/shaders penv/shaders /E /I
-    xcopy resources penv/resources /E /I
+    xcopy prism\assets penv\assets /E /I /Q >nul 2>&1
+    xcopy prism\shaders penv\shaders /E /I /Q >nul 2>&1
+    xcopy resources penv\resources /E /I /Q >nul 2>&1
     cd "penv"
     mkdir "build"
     cd ..
@@ -37,14 +37,14 @@ if NOT exist "penv" (
 
 :: compile shaders
 echo Building shaders...
-set SHADERS_DIR=shaders
+set SHADERS_DIR=prism/shaders
 set "startTime=%time: =0%"
 set SHADERS_UP_TO_DATE="true"
 for /r %SHADERS_DIR% %%f in (*.vert *.frag *.comp) do (
     if NOT exist "build/cache/shaders/%%~nxf" (
         set SHADERS_UP_TO_DATE="false"
         echo - [%%~nxf] [33m^(compiling...^)[0m
-        "platform/windows/glslc/glslc.exe" %%f -o "build/shaders/%%~nxf.spv"
+        "prism/platform/windows/glslc/glslc.exe" %%f -o "build/shaders/%%~nxf.spv"
         if !ERRORLEVEL! NEQ 0 (
             echo Building shader [31mFailed[0m with error code !ERRORLEVEL!
             exit /b !ERRORLEVEL!
