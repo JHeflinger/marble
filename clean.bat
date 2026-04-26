@@ -14,3 +14,6 @@ if exist "build\expanded" (
 if exist "build\bin.exe" (
     del /f /q "build\bin.exe"
 )
+if exist "penv" (
+    rmdir /s /q "penv"
+)

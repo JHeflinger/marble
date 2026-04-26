@@ -51,10 +51,12 @@ if "%1"=="-u" (
 if NOT exist "penv" (
     mkdir "penv"
     xcopy prism\assets penv\assets /E /I /Q >nul 2>&1
-    xcopy prism\shaders penv\shaders /E /I /Q >nul 2>&1
     xcopy resources penv\resources /E /I /Q >nul 2>&1
     cd "penv"
     mkdir "build"
+    cd build
+    xcopy ..\..\build\expanded expanded /E /I /Q >nul 2>&1
+    cd ..
     cd ..
 )
 

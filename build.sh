@@ -24,17 +24,6 @@ if [ ! -d "prism/src" ]; then
     git submodule update --init --recursive
 fi
 
-# set up running env
-if [ ! -d "penv" ]; then
-    mkdir "penv"
-    cp -r prism/assets penv/assets
-    cp -r prism/shaders penv/shaders
-    cp -r resources penv/resources
-    cd "penv"
-    mkdir "build"
-    cd ..
-fi
-
 # download simp
 if [ ! -f "build/simp_linux.bin" ] || [ "$1" == "-u" ] || [ "$2" == "-u" ]; then
     if [ -f "build/simp_linux.bin" ]; then
@@ -51,6 +40,19 @@ fi
 
 # expand shaders
 ./build/simp_linux.bin prism/shaders build/expanded
+
+# set up running env
+if [ ! -d "penv" ]; then
+    mkdir "penv"
+    cp -r prism/assets penv/assets
+    cp -r resources penv/resources
+    cd "penv"
+    mkdir "build"
+    cd build
+    cp -r ../../build/expanded expanded
+    cd ..
+    cd ..
+fi
 
 # compile shaders
 echo "Compiling shaders..."
