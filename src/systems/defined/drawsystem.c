@@ -63,6 +63,24 @@ void DrawTextComponent(Entity e, Vector2 origin) {
 
 void DrawDrawSystem(System* system) {
     RenderConfig()->reset = TRUE;
+    UpdateLights();
+    Render();
+    RenderTexture2D target = GetViewportTarget();
+    Vector2 slice = GetViewportSlice();
+    BeginTextureMode(target);
+    Draw(0, 0, slice.x, slice.y);
+    Vector2 image_origin = (Vector2){ slice.x / 2.0f - target.texture.width / 2.0f, slice.y / 2.0f - target.texture.height / 2.0f };
+    ARRLIST_EntityID* text_entities = GetEntities(system->context, TextComponent);
+    if (text_entities) {
+        for (size_t i = 0; i < text_entities->size; i++) {
+            Entity e = (Entity){ text_entities->data[i], system->context };
+            DrawTextComponent(e, image_origin);
+        }
+    }
+    EndTextureMode();
+}
+
+void UpdateDrawSystem(System* system, float dt) {
     ARRLIST_EntityID* mesh_entities = GetEntities(system->context, MeshComponent);
     if (mesh_entities) {
         for (size_t i = 0 ; i < mesh_entities->size; i++) {
@@ -82,23 +100,8 @@ void DrawDrawSystem(System* system) {
             UpdateObjectTransform(mc->id);
         }
     }
-    UpdateLights();
-    Render();
-    RenderTexture2D target = GetViewportTarget();
-    Vector2 slice = GetViewportSlice();
-    BeginTextureMode(target);
-    Draw(0, 0, slice.x, slice.y);
-    Vector2 image_origin = (Vector2){ slice.x / 2.0f - target.texture.width / 2.0f, slice.y / 2.0f - target.texture.height / 2.0f };
-    ARRLIST_EntityID* text_entities = GetEntities(system->context, TextComponent);
-    if (text_entities) {
-        for (size_t i = 0; i < text_entities->size; i++) {
-            Entity e = (Entity){ text_entities->data[i], system->context };
-            DrawTextComponent(e, image_origin);
-        }
-    }
-    EndTextureMode();
 }
 
 System* GenerateDrawSystem() {
-    return GenerateSystem(DrawDrawSystem, NULL, NULL, NULL, NULL, NULL, NULL);
+    return GenerateSystem(DrawDrawSystem, UpdateDrawSystem, NULL, NULL, NULL, NULL, NULL);
 }

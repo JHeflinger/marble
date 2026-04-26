@@ -80,4 +80,16 @@ EXPOSE_COMPONENT(AIComponent) {
     BehaviorNode* root;
 };
 
+EXPOSE_COMPONENT(AudioBarrierComponent) {
+    size_t meshid;
+};
+
+EXPOSE_COMPONENT(AudioSourceComponent) {
+    Sound sound;
+};
+
+EXPOSE_COMPONENT(AudioListenerComponent) {
+    size_t fidelity;
+};
+
 #endif

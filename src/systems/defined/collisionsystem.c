@@ -530,7 +530,7 @@ BOOL DispatchCollision(Entity e1, Collider c1, Entity e2, Collider c2) {
 void UpdateCollisionSystem(System* system, float dt) {
     ARRLIST_EntityID* dynamics = GetEntities(system->context, DynamicCollisionComponent);
     ARRLIST_EntityID* statics = GetEntities(system->context, StaticCollisionComponent);
-    if (statics) ReconstructBVH(&g_bvh, *statics, system->context);
+    if (statics) ReconstructCollisionBVH(&g_bvh, *statics, system->context);
     if (dynamics) {
         for (size_t i = 0; i < dynamics->size; i++) {
             Entity e = (Entity){ dynamics->data[i], system->context };
@@ -541,7 +541,7 @@ void UpdateCollisionSystem(System* system, float dt) {
         for (size_t i = 0; i < dynamics->size; i++) {
             Entity ei = (Entity){ dynamics->data[i], system->context };
             QuerySpaceGrid(&g_sgrid, g_iterations, ei, DispatchCollision);
-            if (statics) QueryBVH(&g_bvh, ei, DispatchCollision);
+            if (statics) QueryCollisionBVH(&g_bvh, ei, DispatchCollision);
         }
     }
     g_iterations++;
