@@ -45,7 +45,7 @@ if "%1"=="-u" (
 )
 
 :: expand shaders
-"./build/simp_windows.exe" shaders build/expanded
+"./build/simp_windows.exe" prism/shaders build/expanded
 
 :: set up running env
 if NOT exist "penv" (
