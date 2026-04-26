@@ -12,6 +12,9 @@ if NOT exist "shaders\" (
 if NOT exist "cache\" (
     mkdir cache
 )
+if NOT exist "expanded\" (
+    mkdir expanded
+)
 cd cache
 if NOT exist "shaders\" (
     mkdir shaders
@@ -23,6 +26,26 @@ cd ..
 if NOT exist "prism\src\" (
     git submodule update --init --recursive
 )
+
+:: download simp
+if NOT exist "build\simp_windows.exe" (
+    echo Downloading simp importer...
+    cd build
+    PowerShell -Command "Invoke-WebRequest -Uri 'https://github.com/JHeflinger/simp/raw/refs/heads/main/bin/simp_windows.exe' -OutFile 'simp_windows.exe'"
+    cd ..
+)
+if "%1"=="-u" (
+    if exist "build\simp_windows.exe" (
+        del \f \q build\simp_windows.exe
+    )
+    echo Updating simp importer...
+    cd build
+    PowerShell -Command "Invoke-WebRequest -Uri 'https://github.com/JHeflinger/simp/raw/refs/heads/main/bin/simp_windows.exe' -OutFile 'simp_windows.exe'"
+    cd ..
+)
+
+:: expand shaders
+"./build/simp_windows.exe" shaders build/expanded
 
 :: set up running env
 if NOT exist "penv" (
@@ -37,7 +60,7 @@ if NOT exist "penv" (
 
 :: compile shaders
 echo Building shaders...
-set SHADERS_DIR=prism/shaders
+set SHADERS_DIR=build\expanded
 set "startTime=%time: =0%"
 set SHADERS_UP_TO_DATE="true"
 for /r %SHADERS_DIR% %%f in (*.vert *.frag *.comp) do (

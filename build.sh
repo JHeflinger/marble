@@ -9,6 +9,9 @@ fi
 if [ ! -d "cache" ]; then
     mkdir "cache"
 fi
+if [ ! -d "expanded" ]; then
+    mkdir "expanded"
+fi
 cd cache
 if [ ! -d "shaders" ]; then
     mkdir "shaders"
@@ -31,6 +34,23 @@ if [ ! -d "penv" ]; then
     mkdir "build"
     cd ..
 fi
+
+# download simp
+if [ ! -f "build/simp_linux.bin" ] || [ "$1" == "-u" ] || [ "$2" == "-u" ]; then
+    if [ -f "build/simp_linux.bin" ]; then
+        echo "Updating simp importer..."
+        rm build/simp_linux.bin
+    else
+        echo "Downloading simp importer..."
+    fi
+    cd build
+    curl -L -s -o "simp_linux.bin" "https://github.com/JHeflinger/simp/raw/refs/heads/main/bin/simp_linux.bin"
+    chmod +x simp_linux.bin
+    cd ..
+fi
+
+# expand shaders
+./build/simp_linux.bin prism/shaders build/expanded
 
 # compile shaders
 echo "Compiling shaders..."
@@ -61,7 +81,7 @@ while IFS= read -r file; do
             cp $file "build/cache/shaders/$filename"
         fi
     fi
-done < <(find "prism/shaders" -type f \( -name "*.vert" -o -name "*.frag" -o -name "*.comp" \))
+done < <(find "build/expanded" -type f \( -name "*.vert" -o -name "*.frag" -o -name "*.comp" \))
 endTime=$(date +%s%N)
 elapsed=$(((endTime - startTime) / 1000000))
 hh=$((elapsed / 3600000))

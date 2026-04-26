@@ -7,6 +7,9 @@ fi
 if [ -f "build/bin.exe" ]; then
     rm build/bin.exe
 fi
+if [ -d "build/expanded" ]; then
+    rm -rf build/expanded
+fi
 if [ -d "penv" ]; then
     rm -rf penv
 fi
