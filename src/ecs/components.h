@@ -4,6 +4,7 @@
 #include "util/geometry.h"
 #include "util/navigation.h"
 #include "util/ai.h"
+#include "audio/dsp.h"
 
 #define EXPOSE_COMPONENT(name) enum { name##_TYPE = __COUNTER__ }; struct name; typedef struct name name; struct name
 
@@ -85,7 +86,8 @@ EXPOSE_COMPONENT(AudioBarrierComponent) {
 };
 
 EXPOSE_COMPONENT(AudioSourceComponent) {
-    Sound sound;
+    Music music; // to use raylib tools for music like streaming
+    DSPState* dsp;
 };
 
 EXPOSE_COMPONENT(AudioListenerComponent) {

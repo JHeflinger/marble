@@ -3,9 +3,13 @@
 #include "ecs/entity.h"
 #include "game/world.h"
 #include "util/bvh.h"
+#include "audio/dsp.h"
 #include <raymath.h>
+#include <math.h>
 
 #define MAX_BOUNCES 10
+#define SPEED_OF_SOUND 343.0f
+#define BOUNCE_ABSORPTION 0.8f
 
 DECLARE_ARRLIST(TransformComponent);
 IMPL_ARRLIST(TransformComponent);
@@ -16,6 +20,23 @@ ARRLIST_EntityID g_verify_audio_barrier_entities = { 0 };
 ARRLIST_size_t g_verify_audio_mesh_ids = { 0 };
 ARRLIST_TransformComponent g_verify_audio_transforms = { 0 };
 BOOL g_audio_init = FALSE;
+
+DECLARE_ARRLIST(Tap);
+IMPL_ARRLIST(Tap);
+
+DSPState* g_audio_dsp = NULL;
+unsigned int g_audio_channels = 1; // make 2 later
+
+void DSPProcessorCallback(void* buffer, unsigned int frames) {
+    if (g_audio_dsp) DSPProcess(g_audio_dsp, (float*)buffer, frames, g_audio_channels);
+}
+
+// amplitude function, but might change if we have different materials or source properties
+float TapAmplitude(float pathLength, size_t bounces) {
+    float distanceFalloff = 1.0f / (1.0f + pathLength);
+    float bounceFalloff = powf(BOUNCE_ABSORPTION, (float)bounces);
+    return distanceFalloff * bounceFalloff;
+}
 
 void FibbonaciRays(AudioRay* rays, size_t count, Vector3 p) {
     const float golden_angle = GLM_PI * (sqrtf(5.0f) - 1.0f);
@@ -39,14 +60,13 @@ void ReflectDirection(vec3 dir, vec3 normal, vec3 dest) {
     glm_vec3_normalize(dest);
 }
 
-void PathTrace(AudioRay ray, ARRLIST_EntityID* sources, ARRLIST_float* pools, World* context) {
+void PathTrace(AudioRay ray, ARRLIST_EntityID* sources, ARRLIST_Tap* tapLists, World* context) {
     float total_dist = 0.0f;
     for (size_t i = 0; i < MAX_BOUNCES; i++) {
         AudioHit hit = TraceAudioRay(ray, &g_audio_bvh, &g_audio_triangles);
         if (hit.distance <= 0) break;
         total_dist += hit.distance;
         for (size_t j = 0; j < sources->size; j++) {
-            if (pools->data[j] != 0) continue;
             Entity e = (Entity){ sources->data[j], context };
             TransformComponent* tc = GetComponent(e, TransformComponent);
             AudioRay sray;
@@ -58,10 +78,17 @@ void PathTrace(AudioRay ray, ARRLIST_EntityID* sources, ARRLIST_float* pools, Wo
             glm_vec3_scale(hit.normal, 1e-6, iota);
             glm_vec3_add(iota, hit.position, sray.position);
             AudioHit shit = TraceAudioRay(sray, &g_audio_bvh, &g_audio_triangles);
-            if (shit.distance <= 0.0f || shit.distance < dist) continue;
-            pools->data[j] = total_dist + dist;
+            if (shit.distance > 0.0f && shit.distance < dist) continue;
+            float pathLength = total_dist + dist;
+
+            float jitter = ((float)rand() / (float)RAND_MAX - 0.5f) * 0.0005f;
+            Tap tap = {
+                .delay_seconds = pathLength / SPEED_OF_SOUND + jitter,
+                .amplitude = TapAmplitude(pathLength, i + 1)
+            };
+            ARRLIST_Tap_add(&tapLists[j], tap);
         }
-        ReflectDirection(ray.direction, hit.normal, ray.direction); // TODO: just straight reflection for now, decide how to treat audio materals later
+        ReflectDirection(ray.direction, hit.normal, ray.direction);
         vec3 iota;
         glm_vec3_scale(hit.normal, 1e-6, iota);
         glm_vec3_add(hit.position, iota, ray.position);
@@ -131,30 +158,51 @@ void UpdateAudioSystem(System* system, float dt) {
             TransformComponent* tc = GetComponent(e, TransformComponent);
             AudioRay* rays = EZ_ALLOC(alc->fidelity, sizeof(AudioRay));
             FibbonaciRays(rays, alc->fidelity, tc->translation);
-            ARRLIST_float totaldists = { 0 };
-            ARRLIST_float_zero(&totaldists, sources->size);
-            ARRLIST_float currdists = { 0 };
-            ARRLIST_float_zero(&currdists, sources->size);
-            ARRLIST_int counts = { 0 };
-            ARRLIST_int_zero(&counts, sources->size);
-            for (size_t j = 0; j < alc->fidelity; j++) {
-                for (size_t k = 0; k < sources->size; k++) currdists.data[k] = 0.0f;
-                PathTrace(rays[j], sources, &currdists, system->context);
-                for (size_t k = 0; k < sources->size; k++) {
-                    if (currdists.data[k] != 0) counts.data[k]++;
-                    totaldists.data[k] += currdists.data[k];
-                }
-            }
-            // TODO: currently just scales with visibility, should also scale with distance
+
+            // one tap list per source
+            ARRLIST_Tap* tapLists = EZ_ALLOC(sources->size, sizeof(ARRLIST_Tap));
+            for (size_t j = 0; j < sources->size; j++) tapLists[j] = (ARRLIST_Tap){ 0 };
+
+            // direct tap test to replace an explicit dry sample
             for (size_t j = 0; j < sources->size; j++) {
                 Entity es = (Entity){ sources->data[j], system->context };
-                float visibility = ((float)counts.data[j]) / ((float)alc->fidelity);
-                AudioSourceComponent* asc = GetComponent(es, AudioSourceComponent);
-                SetSoundVolume(asc->sound, visibility);
+                TransformComponent* stc = GetComponent(es, TransformComponent);
+                AudioRay direct;
+                vec3 listenerPos = { tc->translation.x, tc->translation.y, tc->translation.z };
+                vec3 sourcePos = { stc->translation.x, stc->translation.y, stc->translation.z };
+                glm_vec3_sub(sourcePos, listenerPos, direct.direction);
+                float dist = glm_vec3_norm(direct.direction);
+                glm_vec3_normalize(direct.direction);
+                glm_vec3_copy(listenerPos, direct.position);
+                AudioHit hit = TraceAudioRay(direct, &g_audio_bvh, &g_audio_triangles);
+
+                if (hit.distance <= 0.0f || hit.distance > dist) {
+                    // jitter makes reflections sound naturally uneven
+                    float jitter = ((float)rand() / (float)RAND_MAX - 0.5f) * 0.0005f;
+                    Tap tap = {
+                        .delay_seconds = dist / SPEED_OF_SOUND + jitter,
+                        .amplitude = TapAmplitude(dist, 0)
+                    };
+                    ARRLIST_Tap_add(&tapLists[j], tap);
+                }
             }
-            ARRLIST_int_clear(&counts);
-            ARRLIST_float_clear(&totaldists);
-            ARRLIST_float_clear(&currdists);
+
+            for (size_t j = 0; j < alc->fidelity; j++) {
+                PathTrace(rays[j], sources, tapLists, system->context);
+            }
+
+            for (size_t j = 0; j < sources->size; j++) {
+                Entity es = (Entity){ sources->data[j], system->context };
+                AudioSourceComponent* asc = GetComponent(es, AudioSourceComponent);
+                if (asc->dsp) {
+                    size_t count = tapLists[j].size;
+                    if (count > DSP_MAX_TAPS) count = DSP_MAX_TAPS;
+                    DSPSubmitTaps(asc->dsp, tapLists[j].data, count);
+                }
+                ARRLIST_Tap_clear(&tapLists[j]);
+            }
+
+            EZ_FREE(tapLists);
             EZ_FREE(rays);
         }
     }

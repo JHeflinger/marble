@@ -4,6 +4,7 @@
 #include "game/application.h"
 #include "ecs/components.h"
 #include "ecs/entity.h"
+#include "audio/dsp.h"
 #include <renderer/renderer.h>
 #include <raymath.h>
 
@@ -24,6 +25,9 @@ void UpdateMainScene(World* scene, float dt) {
     if (IsKeyDown(KEY_S)) {
         EntityPosition(g_player)->z += dt * 10.0f;
     }
+
+    AudioSourceComponent* asc = GetComponent(g_enemy, AudioSourceComponent);
+    if (asc) UpdateMusicStream(asc->music);
 }
 
 Scene* GenerateMainScene() {
@@ -53,15 +57,25 @@ Scene* GenerateMainScene() {
     // pacman
     g_player = CreateEntityP(world, 37.0f, 5.5f, 0.0f);
     AddComponent(g_player, MeshComponent, UploadGeometry("resources/models/pacman/pacman.obj"));
-    AddComponent(g_player, AudioListenerComponent, 200);
+    AddComponent(g_player, AudioListenerComponent, 20);
     *(EntityScale(g_player)) = (Vector3){ 0.75f, 0.75f, 0.75f };
 
     // ghost
     g_enemy = CreateEntityP(world, -37.0f, 5.8f, 0.0f);
-    Sound ambient = LoadSound("resources/sounds/ambient.mp3");
+    Music ambient = LoadMusicStream("resources/sounds/click1.mp3");
+    ambient.looping = true;
+    DSPState* dsp = DSPInit(ambient.stream.sampleRate, 2.0f);
     AddComponent(g_enemy, MeshComponent, UploadGeometry("resources/models/ghost/ghost.obj"));
-    AddComponent(g_enemy, AudioSourceComponent, ambient);
-    PlaySound(ambient);
+    AddComponent(g_enemy, AudioSourceComponent, ambient, dsp);
+
+    // todo: make less ugly with extern lines
+    extern DSPState* g_audio_dsp;
+    extern unsigned int g_audio_channels;
+    extern void DSPProcessorCallback(void* buffer, unsigned int frames);
+    g_audio_dsp = dsp;
+    g_audio_channels = ambient.stream.channels;
+    AttachAudioStreamProcessor(ambient.stream, DSPProcessorCallback);
+    PlayMusicStream(ambient);
 
     return scene;
 }
