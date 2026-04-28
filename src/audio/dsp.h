@@ -24,11 +24,11 @@ typedef struct {
 
 typedef struct DSPState DSPState; // in .c
 
-DSPState* DSPInit(int sample_rate, float max_delay_secs);
+DSPState* DSPInit(int sampleRate, float maxDelaySecs);
 
 void DSPDestroy(DSPState* state);
 
-void DSPSubmitTaps(DSPState* state, const Tap* taps, size_t num_taps);
+void DSPSubmitTaps(DSPState* state, const Tap* taps, size_t numTaps);
 
 /*
  * process a buffer of audio in place

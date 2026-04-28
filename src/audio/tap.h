@@ -1,9 +1,9 @@
+#ifndef TAP_H
+#define TAP_H
+
 //
 // Created by Patback on 4/27/2026.
 //
-
-#ifndef TAP_H
-#define TAP_H
 
 /**
  * Tap = a delayed attenuated copy of a source

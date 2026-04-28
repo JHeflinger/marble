@@ -98,6 +98,17 @@ void CleanComponents(Registry* registry) {
             }
         }
     }
+
+    // AudioSourceComponent
+    {
+        ARRLIST_EntityID* as = RegistryGetEntities(registry, AudioSourceComponent_TYPE);
+        if (as) {
+            for (size_t i = 0; i < as->size; i++) {
+                AudioSourceComponent* asc = RegistryGetComponent(registry, as->data[i], AudioSourceComponent_TYPE);
+                DSPDestroy(asc->dsp);
+            }
+        }
+    }
 }
 
 void DestroyRegistry(Registry* registry) {

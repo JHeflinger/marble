@@ -1,5 +1,6 @@
 #include "dsp.h"
 
+#include <easymemory.h>
 #include <stdatomic.h>
 #include <stdlib.h>
 #include <string.h>
@@ -13,15 +14,15 @@ struct DSPState {
 };
 
 DSPState* DSPInit(int sampleRate, float maxDelaySecs) {
-    DSPState* state = (DSPState*)calloc(1, sizeof(DSPState));
+    DSPState* state = EZ_ALLOC(1, sizeof(DSPState));
     if (!state) return NULL;
 
     size_t capacity = (size_t)((float)sampleRate * maxDelaySecs);
     if (capacity < 1) capacity = 1;
 
-    state->delayLine.samples = (float*)calloc(capacity, sizeof(float));
+    state->delayLine.samples = EZ_ALLOC(capacity, sizeof(float));
     if (!state->delayLine.samples) {
-        free(state);
+        EZ_FREE(state);
         return NULL;
     }
     state->delayLine.capacity = capacity;
@@ -37,8 +38,8 @@ DSPState* DSPInit(int sampleRate, float maxDelaySecs) {
 
 void DSPDestroy(DSPState* state) {
     if (!state) return;
-    free(state->delayLine.samples);
-    free(state);
+    EZ_FREE(state->delayLine.samples);
+    EZ_FREE(state);
 }
 
 void DSPSubmitTaps(DSPState* state, const Tap* taps, size_t numTaps) {
