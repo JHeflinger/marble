@@ -33,4 +33,10 @@ Matrix EntityTransform(const Entity e);
 
 Vector3 EntityOrient(const Entity e, Vector3 vector);
 
+void MoveEntityFPV(const Entity e, Vector3 translation);
+
+void MoveFlatEntityFPV(const Entity e, Vector3 translation);
+
+void RotateEntityFPV(const Entity e, Vector3 delta);
+
 #endif

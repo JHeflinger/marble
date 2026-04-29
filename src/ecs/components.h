@@ -94,4 +94,10 @@ EXPOSE_COMPONENT(AudioListenerComponent) {
     size_t fidelity;
 };
 
+EXPOSE_COMPONENT(CameraComponent) {
+    BOOL enabled;
+    Vector3 offset;
+    Vector3 rotation;
+};
+
 #endif

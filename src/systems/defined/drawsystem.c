@@ -62,9 +62,43 @@ void DrawTextComponent(Entity e, Vector2 origin) {
 }
 
 void DrawDrawSystem(System* system) {
+    ARRLIST_EntityID* cameras = GetEntities(system->context, CameraComponent);
+    SimpleCamera currcamera = GetCamera();
+    if (cameras) {
+        BOOL found = FALSE;
+        for (size_t i = 0; i < cameras->size; i++) {
+            Entity e = (Entity){ cameras->data[i], system->context };
+            CameraComponent* cc = GetComponent(e, CameraComponent);
+            TransformComponent* tc = GetComponent(e, TransformComponent);
+            if (cc->enabled) {
+                if (found) EZ_WARN("More than one camera component was detected to be enabled - any additional camers will override the previous one");
+                found = TRUE;
+                SimpleCamera sc = currcamera;
+                vec3 translation = { tc->translation.x, tc->translation.y, tc->translation.z };
+                vec3 rotation = { tc->rotation.x, tc->rotation.y, tc->rotation.z };
+                vec3 ctranslation = { cc->offset.x, cc->offset.y, cc->offset.z };
+                vec3 crotation = { cc->rotation.x, cc->rotation.y, cc->rotation.z };
+                glm_vec3_add(translation, ctranslation, translation);
+                glm_vec3_add(rotation, crotation, rotation);
+                mat4 R;
+                glm_euler_yxz(rotation, R);
+                vec3 forward = {0.0f, 0.0f, -1.0f};
+                vec3 up = {0.0f, 1.0f,  0.0f};
+                vec3 look, cam_up;
+                glm_mat4_mulv3(R, forward, 0.0f, look);
+                glm_mat4_mulv3(R, up, 0.0f, cam_up);
+                glm_vec3_copy(translation, sc.position);
+                glm_vec3_add(translation, look, look);
+                glm_vec3_copy(look, sc.look);
+                glm_vec3_copy(cam_up, sc.up);
+                MoveCamera(sc);
+            }
+        }
+    }
     RenderConfig()->reset = TRUE;
     UpdateLights();
     Render();
+    MoveCamera(currcamera);
     RenderTexture2D target = GetViewportTarget();
     Vector2 slice = GetViewportSlice();
     BeginTextureMode(target);

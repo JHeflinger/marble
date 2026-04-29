@@ -13,18 +13,21 @@ Entity g_player;
 Entity g_enemy;
 
 void UpdateMainScene(World* scene, float dt) {
-    if (IsKeyDown(KEY_D)) {
-        EntityPosition(g_player)->x += dt * 10.0f;
+    CameraComponent* cc = GetComponent(g_player, CameraComponent);
+    if (IsKeyPressed(KEY_P)) cc->enabled = !cc->enabled;
+    if (cc->enabled) {
+        Vector3 translate = { 0 };
+        if (IsKeyDown(KEY_D)) translate.x += dt * 10.0f;
+        if (IsKeyDown(KEY_A)) translate.x -= dt * 10.0f;
+        if (IsKeyDown(KEY_W)) translate.z -= dt * 10.0f;
+        if (IsKeyDown(KEY_S)) translate.z += dt * 10.0f;
+        Vector2 md = GetMouseDelta();
+        Vector3 rotate = { md.y * dt * -0.15f, md.x * dt * -0.15f, 0 };
+        RotateEntityFPV(g_player, rotate);
+        MoveFlatEntityFPV(g_player, translate);
+        DisableCursor();
     }
-    if (IsKeyDown(KEY_A)) {
-        EntityPosition(g_player)->x -= dt * 10.0f;
-    }
-    if (IsKeyDown(KEY_W)) {
-        EntityPosition(g_player)->z -= dt * 10.0f;
-    }
-    if (IsKeyDown(KEY_S)) {
-        EntityPosition(g_player)->z += dt * 10.0f;
-    }
+    EnableCursor();
 
     AudioSourceComponent* asc = GetComponent(g_enemy, AudioSourceComponent);
     if (asc) UpdateMusicStream(asc->music);
@@ -56,9 +59,8 @@ Scene* GenerateMainScene() {
 
     // pacman
     g_player = CreateEntityP(world, 37.0f, 5.5f, 0.0f);
-    AddComponent(g_player, MeshComponent, UploadGeometry("resources/models/pacman/pacman.obj"));
     AddComponent(g_player, AudioListenerComponent, 20);
-    *(EntityScale(g_player)) = (Vector3){ 0.75f, 0.75f, 0.75f };
+    AddComponent(g_player, CameraComponent, FALSE, {0,0,0}, {0,0,0});
 
     // ghost
     g_enemy = CreateEntityP(world, -37.0f, 5.8f, 0.0f);

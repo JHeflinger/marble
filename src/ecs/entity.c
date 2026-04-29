@@ -67,3 +67,24 @@ Vector3 EntityOrient(const Entity e, Vector3 vector) {
     Matrix rotation = MatrixMultiply(MatrixMultiply(rotZ, rotX), rotY);
     return Vector3Transform(vector, rotation);
 }
+
+void MoveEntityFPV(const Entity e, Vector3 translation) {
+    TransformComponent* tc = GetComponent(e, TransformComponent);
+    Matrix rot = MatrixRotateXYZ(tc->rotation);
+    Vector3 world_move = Vector3Transform(translation, rot);
+    tc->translation = Vector3Add(tc->translation, world_move);
+}
+
+void MoveFlatEntityFPV(const Entity e, Vector3 translation) {
+    TransformComponent* tc = GetComponent(e, TransformComponent);
+    Matrix rot = MatrixRotateXYZ((Vector3){ 0, tc->rotation.y, 0 });
+    Vector3 world_move = Vector3Transform(translation, rot);
+    tc->translation = Vector3Add(tc->translation, world_move);
+}
+
+void RotateEntityFPV(const Entity e, Vector3 delta) {
+    TransformComponent* tc = GetComponent(e, TransformComponent);
+    tc->rotation.x += delta.x;
+    tc->rotation.y += delta.y;
+    tc->rotation.z += delta.z;
+}
