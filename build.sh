@@ -9,6 +9,9 @@ fi
 if [ ! -d "cache" ]; then
     mkdir "cache"
 fi
+if [ ! -d "extended" ]; then
+    mkdir "extended"
+fi
 if [ ! -d "expanded" ]; then
     mkdir "expanded"
 fi
@@ -38,8 +41,12 @@ if [ ! -f "build/simp_linux.bin" ] || [ "$1" == "-u" ] || [ "$2" == "-u" ]; then
     cd ..
 fi
 
+# copy to extended
+cp -r prism/shaders/* build/extended/
+cp -r shaders/* build/extended/
+
 # expand shaders
-./build/simp_linux.bin prism/shaders build/expanded
+./build/simp_linux.bin build/extended build/expanded
 
 # set up running env
 if [ ! -d "penv" ]; then
@@ -49,6 +56,7 @@ if [ ! -d "penv" ]; then
     cd "penv"
     mkdir "build"
     cd build
+    mkdir "shaders"
     cp -r ../../build/expanded expanded
     cd ..
     cd ..

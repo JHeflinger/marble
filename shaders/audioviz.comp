@@ -1,0 +1,68 @@
+#import Boilerplate
+#import Definitions
+
+#import BVHNodeDef;
+#import RayDef;
+#import HitDef;
+#import TriangleDef;
+
+layout(binding = 0) readonly #import UniformBufferObjectDef ubo;
+layout(binding = 1, rgba8) #import OutputImageDef;
+layout(binding = 2) readonly #import BVHNodeSSBODef;
+layout(binding = 3) readonly #import TriangleSSBODef;
+layout(binding = 4) readonly #import TransformedVertexSSBODef;
+layout(binding = 5) readonly #import NormalSSBODef;
+layout(binding = 6) buffer AudioRaySSBOIn {
+    Ray rayIn[ ];
+};
+
+#import TriangleIntersectSuite
+
+vec2 back_propogate(vec3 point) {
+    vec3 dir = point - ubo.position;
+
+    float px = -dot(dir, ubo.u);
+    float py = dot(dir, ubo.v);
+    float pz = -dot(dir, ubo.w);
+
+    if (pz <= 0.0) return vec2(-1.0); // behind camera sentinel
+
+    float focalLength = (ubo.width * 0.5) / tan(ubo.fov * 0.5);
+
+    return vec2(
+        (ubo.width * 0.5) - (px / pz) * focalLength,
+        (ubo.height * 0.5) - (py / pz) * focalLength
+    );
+}
+
+void mark_point(Hit h, vec3 incoming) {
+    vec3 camera_dir = ubo.position - h.position;
+    uint hid = -1;
+    Ray sray = { h.position + normalize(-incoming) * EPS * 10.0, normalize(camera_dir) };
+    Hit shit = trace(sray, hid);
+    if (shit.distance > 0 && shit.distance < length(camera_dir)) return;
+    vec2 pixel = back_propogate(h.position);
+    if (pixel.x >= 0 && pixel.x < ubo.width && pixel.y >= 0 && pixel.y < ubo.height) {
+        vec4 color = imageLoad(outputImage, ivec2(pixel.x, pixel.y));
+        color.a = 0.0;
+	    imageStore(outputImage, ivec2(pixel.x, pixel.y), color);
+    }
+}
+
+void bounce_ray(Ray ray) {
+    uint hid = -1;
+    for (int i = 0; i < 5; i++) {
+        Hit h = trace(ray, hid);
+        if (h.distance <= 0) return;
+        mark_point(h, ray.direction);
+        ray.position = h.position + normalize(-ray.direction) * EPS * 10.0;
+        ray.direction = reflect(ray.direction, h.normal);
+    }
+}
+
+void main() {
+    // trace rays
+    bounce_ray(rayIn[gl_GlobalInvocationID.x]);
+
+	//imageStore(outputImage, ivec2(rx, ry), vec4(0.0, 0.0, 0.0, 1.0));
+}
