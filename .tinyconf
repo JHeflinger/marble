@@ -52,7 +52,6 @@ SOURCE prism/src/data
 SOURCE prism/src/renderer
 SOURCE prism/src/ui
 FLAG audit
-RAW -std=c2x
 DEFINE EXTEND_PRISM
 DEFINE NO_MESH_MANIPULATION_SUPPORT
 LINUX RAW $(pkg-config --cflags --libs gtk+-3.0)
