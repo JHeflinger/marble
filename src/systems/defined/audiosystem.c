@@ -306,6 +306,7 @@ void CleanAudioSystem(System* system) {
     ARRLIST_TransformComponent_clear(&g_verify_audio_transforms);
     ARRLIST_NodeBVH_clear(&g_audio_bvh);
     ARRLIST_MetaTriangle_clear(&g_audio_triangles);
+    SpatialShutdown();
     CloseAudioDevice();
     g_audio_init = FALSE;
 }
