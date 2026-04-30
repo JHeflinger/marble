@@ -30,7 +30,6 @@ void UpdateMainScene(World* scene, float dt) {
         DisableCursor();
     } else {
         md->disabled = FALSE;
-        EnableCursor();
     }
     AudioSourceComponent* asc = GetComponent(g_enemy, AudioSourceComponent);
     if (asc) UpdateMusicStream(asc->music);
