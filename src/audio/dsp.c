@@ -11,6 +11,11 @@ struct DSPState {
     Tap tapBuffers[2][DSP_MAX_TAPS]; // double buffer bc audio is a separate thread with race conds
     size_t tapCounts[2];
     _Atomic int currentBuffer;
+
+    // atomic safe listener directions
+    _Atomic float dirX;
+    _Atomic float dirY;
+    _Atomic float dirZ;
 };
 
 DSPState* DSPInit(int sampleRate, float maxDelaySecs) {
@@ -32,6 +37,10 @@ DSPState* DSPInit(int sampleRate, float maxDelaySecs) {
     state->tapCounts[0] = 0;
     state->tapCounts[1] = 0;
     atomic_store(&state->currentBuffer, 0);
+
+    atomic_store(&state->dirX, 0.0f);
+    atomic_store(&state->dirY, 0.0f);
+    atomic_store(&state->dirZ, -1.0f);
 
     return state;
 }
@@ -57,45 +66,50 @@ void DSPSubmitTaps(DSPState* state, const Tap* taps, size_t numTaps) {
     atomic_store(&state->currentBuffer, back);
 }
 
-void DSPProcess(DSPState* state, float* buffer, unsigned int frames, unsigned int channels) {
-    if (!state || !buffer || channels == 0) return;
+void DSPProcess(DSPState* state, float* monoOut, unsigned int frames) {
+    if (!state || !monoOut) return;
 
     DelayLine* dl = &state->delayLine;
 
-    // swap double-buffer bc audio is a separate thread to the game
     int idx = atomic_load(&state->currentBuffer);
     const Tap* taps = state->tapBuffers[idx];
     size_t numTaps = state->tapCounts[idx];
 
     for (unsigned int f = 0; f < frames; f++) {
-        // downmix incoming frame to a dry sample (for mono, this is no-op for now)
-        float dry = 0.0f;
-        for (unsigned int c = 0; c < channels; c++) {
-            dry += buffer[f * channels + c];
-        }
-        dry /= (float)channels;
+        float dry = monoOut[f];
 
         // write dry sample into buffer
         dl->samples[dl->writeIndex] = dry;
 
-        // sum of contributions over taps
+        // sum contributions from all taps
         float wet = 0.0f;
         for (size_t t = 0; t < numTaps; t++) {
             size_t delaySamples = (size_t)(taps[t].delay_seconds * (float)dl->sampleRate);
             if (delaySamples >= dl->capacity) delaySamples = dl->capacity - 1;
 
-            // walk backward from index
             size_t readIndex = (dl->writeIndex + dl->capacity - delaySamples) % dl->capacity;
             wet += dl->samples[readIndex] * taps[t].amplitude;
         }
 
-        // to be replaced with hrtf later
-        // wet output (single ray used in pathtrace to do dry later)
-        float out = wet; // todo: consider normalization for deeper sounds
-        for (unsigned int c = 0; c < channels; c++) {
-            buffer[f * channels + c] = out;
-        }
+        monoOut[f] = wet;
 
         dl->writeIndex = (dl->writeIndex + 1) % dl->capacity;
     }
+}
+
+void DSPGetDirection(DSPState* state, float* outX, float* outY, float* outZ) {
+    if (!state) {
+        *outX = 0.0f; *outY = 0.0f; *outZ = -1.0f;
+        return;
+    }
+    *outX = atomic_load(&state->dirX);
+    *outY = atomic_load(&state->dirY);
+    *outZ = atomic_load(&state->dirZ);
+}
+
+void DSPSubmitDirection(DSPState* state, float x, float y, float z) {
+    if (!state) return;
+    atomic_store(&state->dirX, x);
+    atomic_store(&state->dirY, y);
+    atomic_store(&state->dirZ, z);
 }

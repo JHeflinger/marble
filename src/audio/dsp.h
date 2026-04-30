@@ -38,6 +38,9 @@ void DSPSubmitTaps(DSPState* state, const Tap* taps, size_t numTaps);
  * reads each tap's delayed sample and sums them into the output. Output is
  * just the wet and processing mostly happens in audiosystem
  */
-void DSPProcess(DSPState* state, float* buffer, unsigned int frames, unsigned int channels);
+void DSPProcess(DSPState* state, float* monoOut, unsigned int frames);
 
+void DSPGetDirection(DSPState* state, float* outX, float* outY, float* outZ);
+
+void DSPSubmitDirection(DSPState* state, float x, float y, float z);
 #endif //DSP_H

@@ -5,6 +5,7 @@
 #include "util/navigation.h"
 #include "util/ai.h"
 #include "audio/dsp.h"
+#include "audio/spatial.h"
 
 #define EXPOSE_COMPONENT(name) enum { name##_TYPE = __COUNTER__ }; struct name; typedef struct name name; struct name
 
@@ -86,8 +87,9 @@ EXPOSE_COMPONENT(AudioBarrierComponent) {
 };
 
 EXPOSE_COMPONENT(AudioSourceComponent) {
-    Music music; // to use raylib tools for music like streaming
+    Music music;
     DSPState* dsp;
+    SpatialSource* spatial;
 };
 
 EXPOSE_COMPONENT(AudioListenerComponent) {

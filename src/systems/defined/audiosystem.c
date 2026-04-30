@@ -10,6 +10,7 @@
 #define MAX_BOUNCES 10
 #define SPEED_OF_SOUND 343.0f
 #define BOUNCE_ABSORPTION 0.8f
+#define MAX_FRAMES_PER_CALLBACK 8192
 
 DECLARE_ARRLIST(TransformComponent);
 IMPL_ARRLIST(TransformComponent);
@@ -25,10 +26,60 @@ DECLARE_ARRLIST(Tap);
 IMPL_ARRLIST(Tap);
 
 DSPState* g_audio_dsp = NULL;
+SpatialSource* g_audio_spatial = NULL;
 unsigned int g_audio_channels = 1; // make 2 later
 
+static float g_mono_scratch[MAX_FRAMES_PER_CALLBACK];
+static float g_stereo_scratch[MAX_FRAMES_PER_CALLBACK * 2];
+
 void DSPProcessorCallback(void* buffer, unsigned int frames) {
-    if (g_audio_dsp) DSPProcess(g_audio_dsp, (float*)buffer, frames, g_audio_channels);
+    if (!g_audio_dsp || frames > MAX_FRAMES_PER_CALLBACK) return;
+
+    float* samples = (float*)buffer;
+
+    float input_max = 0.0f;
+    for (unsigned int f = 0; f < frames * g_audio_channels; f++) {
+        if (fabsf(samples[f]) > input_max) input_max = fabsf(samples[f]);
+    }
+
+    for (unsigned int f = 0; f < frames; f++) {
+        float sum = 0.0f;
+        for (unsigned int c = 0; c < g_audio_channels; c++) {
+            sum += samples[f * g_audio_channels + c];
+        }
+        g_mono_scratch[f] = sum / (float)g_audio_channels;
+    }
+
+    float pre_dsp_max = 0.0f;
+    for (unsigned int f = 0; f < frames; f++) {
+        if (fabsf(g_mono_scratch[f]) > pre_dsp_max) pre_dsp_max = fabsf(g_mono_scratch[f]);
+    }
+
+    DSPProcess(g_audio_dsp, g_mono_scratch, frames);
+
+    float post_dsp_max = 0.0f;
+    for (unsigned int f = 0; f < frames; f++) {
+        if (fabsf(g_mono_scratch[f]) > post_dsp_max) post_dsp_max = fabsf(g_mono_scratch[f]);
+    }
+
+    if (g_audio_spatial) {
+        float dirX, dirY, dirZ;
+        DSPGetDirection(g_audio_dsp, &dirX, &dirY, &dirZ);
+
+        SpatialApply(g_audio_spatial, g_mono_scratch, g_stereo_scratch,
+                     dirX, dirY, dirZ, frames);
+
+        float post_spatial_max = 0.0f;
+        for (unsigned int f = 0; f < frames * 2; f++) {
+            if (fabsf(g_stereo_scratch[f]) > post_spatial_max) post_spatial_max = fabsf(g_stereo_scratch[f]);
+        }
+
+        for (unsigned int f = 0; f < frames; f++) {
+            for (unsigned int c = 0; c < g_audio_channels; c++) {
+                samples[f * g_audio_channels + c] = g_stereo_scratch[f * 2 + (c % 2)];
+            }
+        }
+    }
 }
 
 // amplitude function, but might change if we have different materials or source properties
@@ -156,6 +207,22 @@ void UpdateAudioSystem(System* system, float dt) {
             Entity e = (Entity){ listeners->data[i], system->context };
             AudioListenerComponent* alc = GetComponent(e, AudioListenerComponent);
             TransformComponent* tc = GetComponent(e, TransformComponent);
+
+            // Compute listener orientation from transform + camera (mirrors drawsystem.c).
+            vec3 rotation = { tc->rotation.x, tc->rotation.y, tc->rotation.z };
+            CameraComponent* cc = GetComponent(e, CameraComponent);
+            if (cc) {
+                vec3 crot = { cc->rotation.x, cc->rotation.y, cc->rotation.z };
+                glm_vec3_add(rotation, crot, rotation);
+            }
+            mat4 R;
+            glm_euler_yxz(rotation, R);
+            vec3 base_forward = { 0.0f, 0.0f, -1.0f };
+            vec3 base_up      = { 0.0f, 1.0f,  0.0f };
+            vec3 forward_v, up_v;
+            glm_mat4_mulv3(R, base_forward, 0.0f, forward_v);
+            glm_mat4_mulv3(R, base_up,      0.0f, up_v);
+
             AudioRay* rays = EZ_ALLOC(alc->fidelity, sizeof(AudioRay));
             FibbonaciRays(rays, alc->fidelity, tc->translation);
 
@@ -194,10 +261,35 @@ void UpdateAudioSystem(System* system, float dt) {
             for (size_t j = 0; j < sources->size; j++) {
                 Entity es = (Entity){ sources->data[j], system->context };
                 AudioSourceComponent* asc = GetComponent(es, AudioSourceComponent);
+                TransformComponent* stc = GetComponent(es, TransformComponent);
+
                 if (asc->dsp) {
                     size_t count = tapLists[j].size;
                     if (count > DSP_MAX_TAPS) count = DSP_MAX_TAPS;
                     DSPSubmitTaps(asc->dsp, tapLists[j].data, count);
+
+                    // compute world-space dir from listener to src
+                    vec3 worldDir;
+                    vec3 listenerPos = { tc->translation.x, tc->translation.y, tc->translation.z };
+                    vec3 sourcePos   = { stc->translation.x, stc->translation.y, stc->translation.z };
+                    glm_vec3_sub(sourcePos, listenerPos, worldDir);
+
+                    // project wrt listener
+                    vec3 right;
+                    glm_vec3_cross(forward_v, up_v, right);
+                    glm_vec3_normalize(forward_v);
+                    glm_vec3_normalize(up_v);
+                    glm_vec3_normalize(right);
+
+                    float localX = glm_vec3_dot(worldDir, right);
+                    float localY = glm_vec3_dot(worldDir, up_v);
+                    float localForward = glm_vec3_dot(worldDir, forward_v);
+
+                    float saX = localX;
+                    float saY = localY;
+                    float saZ = -localForward;
+
+                    DSPSubmitDirection(asc->dsp, saX, saY, saZ);
                 }
                 ARRLIST_Tap_clear(&tapLists[j]);
             }

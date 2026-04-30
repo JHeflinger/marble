@@ -5,6 +5,7 @@
 #include "ecs/components.h"
 #include "ecs/entity.h"
 #include "audio/dsp.h"
+#include "audio/spatial.h"
 #include <renderer/renderer.h>
 #include <raymath.h>
 
@@ -33,6 +34,7 @@ void UpdateMainScene(World* scene, float dt) {
     }
     AudioSourceComponent* asc = GetComponent(g_enemy, AudioSourceComponent);
     if (asc) UpdateMusicStream(asc->music);
+
 }
 
 Scene* GenerateMainScene() {
@@ -41,6 +43,13 @@ Scene* GenerateMainScene() {
     AddWorld(scene, world);
     AddSystem(world, GenerateDrawSystem());
     AddSystem(world, GenerateAudioSystem());
+
+    Music ambient = LoadMusicStream("resources/sounds/click1.mp3");
+    ambient.looping = true;
+
+    if (!SpatialInit(ambient.stream.sampleRate, 1 )) {//4096)) {
+        EZ_ERROR("Failed to initialize Steam Audio");
+    }
 
     // maze
     g_terrain = CreateEntity(world);
@@ -60,24 +69,26 @@ Scene* GenerateMainScene() {
     AddComponent(CreateEntity(world), LightComponent, l5);
 
     // pacman
-    g_player = CreateEntityP(world, 37.0f, 5.5f, 0.0f);
+    g_player = CreateEntityP(world, -30.0f, 5.5f, 0.0f);
     AddComponent(g_player, MeshComponent, UploadGeometry("resources/models/pacman/pacman.obj"));
-    AddComponent(g_player, AudioListenerComponent, 20);
     AddComponent(g_player, CameraComponent, FALSE, {0,0,0}, {0,0,0});
+    AddComponent(g_player, AudioListenerComponent, 20);
+    *(EntityScale(g_player)) = (Vector3){ 0.75f, 0.75f, 0.75f };
 
     // ghost
     g_enemy = CreateEntityP(world, -37.0f, 5.8f, 0.0f);
-    Music ambient = LoadMusicStream("resources/sounds/click1.mp3");
-    ambient.looping = true;
     DSPState* dsp = DSPInit(ambient.stream.sampleRate, 2.0f);
+    SpatialSource* spatial = SpatialCreateSource();
     AddComponent(g_enemy, MeshComponent, UploadGeometry("resources/models/ghost/ghost.obj"));
-    AddComponent(g_enemy, AudioSourceComponent, ambient, dsp);
+    AddComponent(g_enemy, AudioSourceComponent, ambient, dsp, spatial);
 
     // todo: make less ugly with extern lines
     extern DSPState* g_audio_dsp;
+    extern SpatialSource* g_audio_spatial;
     extern unsigned int g_audio_channels;
     extern void DSPProcessorCallback(void* buffer, unsigned int frames);
     g_audio_dsp = dsp;
+    g_audio_spatial = spatial;
     g_audio_channels = ambient.stream.channels;
     AttachAudioStreamProcessor(ambient.stream, DSPProcessorCallback);
     PlayMusicStream(ambient);

@@ -22,6 +22,9 @@ fi
 cd ..
 cd ..
 
+# add steam audio
+cp vendor/steamaudio/lib/linux-x64/libphonon.so build/
+
 # download prism if not exist yet
 if [ ! -d "prism/src" ]; then
     git submodule update --init --recursive
@@ -60,6 +63,11 @@ if [ ! -d "penv" ]; then
     cp -r ../../build/expanded expanded
     cd ..
     cd ..
+fi
+
+# add steam audio
+if [ -d "penv" ]; then
+    cp vendor/steamaudio/lib/linux-x64/libphonon.so penv/
 fi
 
 # compile shaders

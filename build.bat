@@ -25,6 +25,9 @@ if NOT exist "shaders\" (
 cd ..
 cd ..
 
+:: add steam audio
+copy /Y "vendor\steamaudio\lib\windows-x64\phonon.dll" "build\" >nul
+
 :: download prism if not exist yet
 if NOT exist "prism\src\" (
     git submodule update --init --recursive
@@ -66,6 +69,11 @@ if NOT exist "penv" (
     xcopy ..\..\build\expanded expanded /E /I /Q >nul 2>&1
     cd ..
     cd ..
+)
+
+:: add steam audio
+if exist "penv" (
+    copy /Y "vendor\steamaudio\lib\windows-x64\phonon.dll" "penv\" >nul
 )
 
 :: compile shaders
