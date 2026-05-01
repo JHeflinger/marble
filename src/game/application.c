@@ -161,7 +161,7 @@ void InitializeApplication(const char* name, const char* goodbye) {
     #ifndef PROD_BUILD
     g_application.memory = EZ_ALLOCATED();
     #endif
-    //OverrideResolution(400, 225);
+    OverrideResolution(800, 450);
     g_application.name = name;
     g_application.goodbye = goodbye;
 	SetTraceLogLevel(LOG_NONE);
@@ -207,7 +207,7 @@ void DestroyApplication() {
     for (size_t i = 0; i < g_application.scenes.size; i++) DestroyScene(g_application.scenes.data[i]);
     ARRLIST_ScenePtr_clear(&g_application.scenes);
     #ifndef PROD_BUILD
-    EZ_ASSERT(g_application.memory == EZ_ALLOCATED(), "Memory cleanup revealed a leak of %d bytes", (int)(EZ_ALLOCATED() - g_application.memory));
+    EZ_ASSERT(EZ_ALLOCATED() == 0, "Memory cleanup revealed a leak of %d bytes", (int)(EZ_ALLOCATED() - g_application.memory));
     #endif
     EZ_INFO("%s", g_application.goodbye);
 }

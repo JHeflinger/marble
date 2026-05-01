@@ -35,17 +35,41 @@ vec2 back_propogate(vec3 point) {
     );
 }
 
-void mark_point(Hit h, vec3 incoming) {
+void splat_point(Hit h, vec3 incoming) {
+    // adjust as needed
+    float worldRadius = 0.03;
+    int steps = 10;
+    int rings = 10;
+
     vec3 camera_dir = ubo.position - h.position;
     uint hid = -1;
-    Ray sray = { h.position + normalize(-incoming) * EPS * 10.0, normalize(camera_dir) };
+    Ray sray = { h.position + h.normal * EPS * 10.0, normalize(camera_dir) };
     Hit shit = trace(sray, hid);
     if (shit.distance > 0 && shit.distance < length(camera_dir)) return;
-    vec2 pixel = back_propogate(h.position);
-    if (pixel.x >= 0 && pixel.x < ubo.width && pixel.y >= 0 && pixel.y < ubo.height) {
-        vec4 color = imageLoad(outputImage, ivec2(pixel.x, pixel.y));
-        color.a = 0.0;
-	    imageStore(outputImage, ivec2(pixel.x, pixel.y), color);
+    vec3 arbitrary = abs(h.normal.x) < 0.9 ? vec3(1, 0, 0) : vec3(0, 1, 0);
+    vec3 tangent = normalize(cross(h.normal, arbitrary));
+    vec3 bitangent = cross(h.normal, tangent);
+    vec2 center = back_propogate(h.position);
+    if (center.x >= 0) {
+        vec4 col = imageLoad(outputImage, ivec2(center));
+        col.a = 0.0;
+        imageStore(outputImage, ivec2(center), col);
+    }
+    for (int ring = 1; ring <= rings; ring++) {
+        float r = worldRadius * (float(ring) / 3.0);
+        int ringsteps = ring * steps;
+        for (int s = 0; s < ringsteps; s++) {
+            float angle = (float(s) / float(ringsteps)) * 2.0 * PI;
+            vec3 worldPt = h.position
+                         + tangent   * cos(angle) * r
+                         + bitangent * sin(angle) * r;
+            vec2 pixel = back_propogate(worldPt);
+            if (pixel.x < 0 || pixel.x >= ubo.width ||
+                pixel.y < 0 || pixel.y >= ubo.height) continue;
+            vec4 color = imageLoad(outputImage, ivec2(pixel));
+            color.a = 0.0;
+            imageStore(outputImage, ivec2(pixel), color);
+        }
     }
 }
 
@@ -54,15 +78,12 @@ void bounce_ray(Ray ray) {
     for (int i = 0; i < 5; i++) {
         Hit h = trace(ray, hid);
         if (h.distance <= 0) return;
-        mark_point(h, ray.direction);
+        splat_point(h, ray.direction);
         ray.position = h.position + normalize(-ray.direction) * EPS * 10.0;
         ray.direction = reflect(ray.direction, h.normal);
     }
 }
 
 void main() {
-    // trace rays
     bounce_ray(rayIn[gl_GlobalInvocationID.x]);
-
-	//imageStore(outputImage, ivec2(rx, ry), vec4(0.0, 0.0, 0.0, 1.0));
 }

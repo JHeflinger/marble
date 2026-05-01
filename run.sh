@@ -4,5 +4,5 @@ if [ $? -ne 0 ]; then
 fi
 cp -r build/shaders/* penv/build/shaders/
 cd penv
-LD_LIBRARY_PATH=$(pwd) ./../build/bin.exe
+LD_LIBRARY_PATH=../vendor/steamaudio/lib/linux-x64 ./../build/bin.exe
 cd ..

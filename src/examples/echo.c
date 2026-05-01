@@ -6,9 +6,11 @@
 #include "ecs/entity.h"
 #include "audio/dsp.h"
 #include "audio/spatial.h"
+#include "util/bvh.h"
 #include <renderer/renderer.h>
 #include <raymath.h>
 
+ShaderBuffer* g_shaderbuffer = NULL;
 Entity g_terrain;
 Entity g_player;
 Entity g_enemy;
@@ -16,7 +18,10 @@ Entity g_enemy;
 void UpdateMainScene(World* scene, float dt) {
     CameraComponent* cc = GetComponent(g_player, CameraComponent);
     MeshDescriptor* md = MeshReference(GetComponent(g_player, MeshComponent)->id);
-    if (IsKeyPressed(KEY_P)) cc->enabled = !cc->enabled;
+    if (IsKeyPressed(KEY_P)) {
+        if (cc->enabled) EnableCursor();
+        cc->enabled = !cc->enabled;
+    }
     if (cc->enabled) {
         md->disabled = TRUE;
         Vector3 translate = { 0 };
@@ -35,6 +40,22 @@ void UpdateMainScene(World* scene, float dt) {
     AudioSourceComponent* asc = GetComponent(g_enemy, AudioSourceComponent);
     if (asc) UpdateMusicStream(asc->music);
 
+    // update audio rays
+    inline void fibbyrays(AudioRay* rays, size_t count, Vector3 p) {
+        const float golden_angle = GLM_PI * (sqrtf(5.0f) - 1.0f);
+        vec3 origin = { p.x, p.y, p.z };
+        for (size_t i = 0; i < count; i++) {
+            float y = 1.0f - ((float)i / (float)(count - 1)) * 2.0f;
+            float r = sqrtf(1.0f - y * y);
+            float theta = golden_angle * (float)i;
+            vec3 dir = { r * cosf(theta), y, r * sinf(theta) };
+            glm_vec3_normalize(dir);
+            glm_vec3_copy(origin, rays[i].position);
+            glm_vec3_copy(dir, rays[i].direction);
+        }
+    }
+    fibbyrays((AudioRay*)g_shaderbuffer->data, 5000, *(EntityPosition(g_player)));
+    UpdateShaderBuffer(g_shaderbuffer);
 }
 
 Scene* GenerateMainScene() {
@@ -74,6 +95,7 @@ Scene* GenerateMainScene() {
     AddComponent(g_player, CameraComponent, FALSE, {0,0,0}, {0,0,0});
     AddComponent(g_player, AudioListenerComponent, 20);
     *(EntityScale(g_player)) = (Vector3){ 0.75f, 0.75f, 0.75f };
+    *(EntityRotation(g_player)) = (Vector3){ 0.0f, 90.0f * DEG2RAD, 0.0f };
 
     // ghost
     g_enemy = CreateEntityP(world, -37.0f, 5.8f, 0.0f);
@@ -97,6 +119,10 @@ Scene* GenerateMainScene() {
 }
 
 void EchoMain() {
+    SubmitExternalShader("build/expanded/audioviz.comp", "build/shaders/audioviz.comp.spv", 5000);
+    SubmitExternalShader("build/expanded/vizfilter.comp", "build/shaders/vizfilter.comp.spv", 1600*900);
+    SubmitExternalShader("build/expanded/switch.comp", "build/shaders/switch.comp.spv", 1600*900);
+    g_shaderbuffer = CreateExternalBuffer("AudioRaySSBOIn", 5000*sizeof(AudioRay));
     InitializeApplication("Echo Example", "See you, Space Cowboy");
     AddScene(GenerateMainScene());
     SetScene("Main");

@@ -7,8 +7,8 @@ void main() {
 	int rx = int(gl_GlobalInvocationID.x%int(ubo.width));
     int ry = int(gl_GlobalInvocationID.x/int(ubo.width));
     vec4 color = imageLoad(outputImage, ivec2(rx, ry));
-    if (color.a != 0) {
-        imageStore(outputImage, ivec2(rx, ry), vec4(0, 0, 0, 1));
+    if (color.a == 1.0) {
+        imageStore(outputImage, ivec2(rx, ry), vec4(color.xyz * 0.1, 1));
     } else {
         color.a = 1.0;
         imageStore(outputImage, ivec2(rx, ry), color);

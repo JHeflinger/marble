@@ -22,9 +22,6 @@ fi
 cd ..
 cd ..
 
-# add steam audio
-cp vendor/steamaudio/lib/linux-x64/libphonon.so build/
-
 # download prism if not exist yet
 if [ ! -d "prism/src" ]; then
     git submodule update --init --recursive

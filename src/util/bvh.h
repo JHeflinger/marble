@@ -41,8 +41,8 @@ typedef struct {
 DECLARE_ARRLIST(MetaTriangle);
 
 typedef struct {
-    vec3 position;
-    vec3 direction;
+    alignas(16) vec3 position;
+    alignas(16) vec3 direction;
 } AudioRay;
 
 typedef struct {
