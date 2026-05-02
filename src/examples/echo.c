@@ -1,19 +1,32 @@
 #include "echo.h"
 #include "systems/defined/drawsystem.h"
 #include "systems/defined/audiosystem.h"
+#include "systems/defined/collisionsystem.h"
 #include "game/application.h"
 #include "ecs/components.h"
 #include "ecs/entity.h"
 #include "audio/dsp.h"
 #include "audio/spatial.h"
-#include "util/bvh.h"
+#include "data/boxloader.h"
+#include "audio/mic.h"
 #include <renderer/renderer.h>
 #include <raymath.h>
+
+#define NUMRAYS 20000
+#define RPR 1000
 
 ShaderBuffer* g_shaderbuffer = NULL;
 Entity g_terrain;
 Entity g_player;
 Entity g_enemy;
+
+typedef struct {
+    alignas(16) vec3 position;
+    alignas(16) vec3 direction;
+    alignas(4) uint32_t author;
+    alignas(4) uint32_t color; // 0 white, 1 red
+    alignas(4) float fade;
+} AuthoredRay;
 
 void UpdateMainScene(World* scene, float dt) {
     CameraComponent* cc = GetComponent(g_player, CameraComponent);
@@ -23,6 +36,7 @@ void UpdateMainScene(World* scene, float dt) {
         cc->enabled = !cc->enabled;
     }
     if (cc->enabled) {
+        MoveFlatEntityFPV(g_enemy, (Vector3){1.0f * dt, 0.0f, 0.0f});
         md->disabled = TRUE;
         Vector3 translate = { 0 };
         if (IsKeyDown(KEY_D)) translate.x += dt * 10.0f;
@@ -41,31 +55,62 @@ void UpdateMainScene(World* scene, float dt) {
     if (asc) UpdateMusicStream(asc->music);
 
     // update audio rays
-    inline void fibbyrays(AudioRay* rays, size_t count, Vector3 p) {
-        const float golden_angle = GLM_PI * (sqrtf(5.0f) - 1.0f);
-        vec3 origin = { p.x, p.y, p.z };
-        for (size_t i = 0; i < count; i++) {
-            float y = 1.0f - ((float)i / (float)(count - 1)) * 2.0f;
-            float r = sqrtf(1.0f - y * y);
-            float theta = golden_angle * (float)i;
-            vec3 dir = { r * cosf(theta), y, r * sinf(theta) };
-            glm_vec3_normalize(dir);
-            glm_vec3_copy(origin, rays[i].position);
-            glm_vec3_copy(dir, rays[i].direction);
-        }
+    static float timer = 0.0f;
+    static int rotation = 0;
+    float fadeaway = 0.1f;
+    timer += GetFrameTime();
+    for (size_t i = 0; i < NUMRAYS; i++) {
+        AuthoredRay* rays = (AuthoredRay*)g_shaderbuffer->data;
+        int rotations = NUMRAYS/(2 * RPR);
+        rays[i].fade -= GetFrameTime() / ((float)rotations * fadeaway);
+        if (rays[i].fade < 0) rays[i].fade = 0;
     }
-    fibbyrays((AudioRay*)g_shaderbuffer->data, 5000, *(EntityPosition(g_player)));
+    if (timer > fadeaway) {
+        timer = 0.0f;
+        rotation = (rotation + 1)%(NUMRAYS/(2 * RPR));
+        size_t mid = GetComponent(g_enemy, MeshComponent)->id;
+        inline void fibbyrays(AuthoredRay* rays, size_t count, Vector3 p, float level, uint32_t color) {
+            const float golden_angle = GLM_PI * (sqrtf(5.0f) - 1.0f);
+            vec3 origin = { p.x, p.y, p.z };
+            for (size_t i = 0; i < count; i++) {
+                float ran = ((float)(rand()%1000)) / 1000.0f;
+                float y = 1.0f - ((float)i / ((float)(count - 1) * level)) * 2.0f;
+                y = 1.0f - ran * 2.0f;
+                float r = sqrtf(1.0f - y * y);
+                float theta = golden_angle * (float)i;
+                vec3 dir = { r * cosf(theta), y, r * sinf(theta) };
+                glm_vec3_normalize(dir);
+                glm_vec3_copy(origin, rays[i].position);
+                glm_vec3_copy(dir, rays[i].direction);
+                if ((float)i / (float)count > level) {
+                    rays[i].direction[0] = 0;
+                    rays[i].direction[1] = 0;
+                    rays[i].direction[2] = 0;
+                }
+                rays[i].author = (uint32_t)mid;
+                rays[i].color = color;
+                rays[i].fade = 1.0f;
+            }
+        }
+        fibbyrays(g_shaderbuffer->data + (rotation * RPR * sizeof(AuthoredRay)), RPR, *(EntityPosition(g_enemy)), 1.0f, 1);
+        fibbyrays(g_shaderbuffer->data + ((NUMRAYS/2) * sizeof(AuthoredRay)) + (rotation * RPR * sizeof(AuthoredRay)), RPR, *(EntityPosition(g_player)), fmin(pow(MicVolume(), 3.0f) * 40.0f, 1.0f), 0);
+    }
     UpdateShaderBuffer(g_shaderbuffer);
 }
 
 Scene* GenerateMainScene() {
+    RenderConfig()->maxbounces = 3;
+    RenderConfig()->scenelightingonly = FALSE;
+    RenderConfig()->scenelightshadows = FALSE;
+    RenderConfig()->directonly = TRUE;
     Scene* scene = GenerateScene("Main");
     World* world = GenerateWorld(NULL, UpdateMainScene, NULL, NULL, NULL, NULL, NULL);
     AddWorld(scene, world);
     AddSystem(world, GenerateDrawSystem());
     AddSystem(world, GenerateAudioSystem());
+    AddSystem(world, GenerateCollisionSystem());
 
-    Music ambient = LoadMusicStream("resources/sounds/click1.mp3");
+    Music ambient = LoadMusicStream("resources/sounds/ghost.mp3");
     ambient.looping = true;
 
     if (!SpatialInit(ambient.stream.sampleRate, 1 )) {//4096)) {
@@ -77,12 +122,16 @@ Scene* GenerateMainScene() {
     MeshComponent* mc = AddComponent(g_terrain, MeshComponent, UploadGeometry("resources/models/maze/maze.obj"));
     AddComponent(g_terrain, AudioBarrierComponent, mc->id);
 
+    // maze collision
+    LoadBoxColliders(world, "resources/data/colliders.json");
+
     // lights
-    LightID l1 = SubmitLight((SceneLight){{ 0 }, { 1, 1, 1 }, { 0, -1.0f, 0 }, 0, 0 });
-    LightID l2 = SubmitLight((SceneLight){{ 0 }, { 0.8f, 0.8f, 0.8f }, { 0.0f, 0.0f, 1.0f }, 0, 0 });
-    LightID l3 = SubmitLight((SceneLight){{ 0 }, { 0.6f, 0.6f, 0.6f }, { 0.0f, 0.0f, -1.0f }, 0, 0 });
-    LightID l4 = SubmitLight((SceneLight){{ 0 }, { 0.4f, 0.4f, 0.4f }, { 1.0f, 0.0f, 0.0f }, 0, 0 });
-    LightID l5 = SubmitLight((SceneLight){{ 0 }, { 0.2f, 0.2f, 0.2f }, { -1.0f, 0.0f, 0.0f }, 0, 0 });
+    float lval = 0.05f;
+    LightID l1 = SubmitLight((SceneLight){{ 0 }, { lval, lval, lval }, { 0, -1.0f, 0 }, 0, 0 });
+    LightID l2 = SubmitLight((SceneLight){{ 0 }, { lval*0.8f, lval*0.8f, lval*0.8f }, { 0.0f, 0.0f, 1.0f }, 0, 0 });
+    LightID l3 = SubmitLight((SceneLight){{ 0 }, { lval*0.6f, lval*0.6f, lval*0.6f }, { 0.0f, 0.0f, -1.0f }, 0, 0 });
+    LightID l4 = SubmitLight((SceneLight){{ 0 }, { lval*0.4f, lval*0.4f, lval*0.4f }, { 1.0f, 0.0f, 0.0f }, 0, 0 });
+    LightID l5 = SubmitLight((SceneLight){{ 0 }, { lval*0.2f, lval*0.2f, lval*0.2f }, { -1.0f, 0.0f, 0.0f }, 0, 0 });
     AddComponent(CreateEntity(world), LightComponent, l1);
     AddComponent(CreateEntity(world), LightComponent, l2);
     AddComponent(CreateEntity(world), LightComponent, l3);
@@ -94,6 +143,7 @@ Scene* GenerateMainScene() {
     AddComponent(g_player, MeshComponent, UploadGeometry("resources/models/pacman/pacman.obj"));
     AddComponent(g_player, CameraComponent, FALSE, {0,0,0}, {0,0,0});
     AddComponent(g_player, AudioListenerComponent, 20);
+    AddComponent(g_player, DynamicCollisionComponent, FALSE, {0,0,0}, BOX_COLLIDER);
     *(EntityScale(g_player)) = (Vector3){ 0.75f, 0.75f, 0.75f };
     *(EntityRotation(g_player)) = (Vector3){ 0.0f, 90.0f * DEG2RAD, 0.0f };
 
@@ -103,6 +153,7 @@ Scene* GenerateMainScene() {
     SpatialSource* spatial = SpatialCreateSource();
     AddComponent(g_enemy, MeshComponent, UploadGeometry("resources/models/ghost/ghost.obj"));
     AddComponent(g_enemy, AudioSourceComponent, ambient, dsp, spatial);
+    AddComponent(g_enemy, StaticCollisionComponent, FALSE, BOX_COLLIDER);
 
     // todo: make less ugly with extern lines
     extern DSPState* g_audio_dsp;
@@ -119,10 +170,10 @@ Scene* GenerateMainScene() {
 }
 
 void EchoMain() {
-    SubmitExternalShader("build/expanded/audioviz.comp", "build/shaders/audioviz.comp.spv", 5000);
-    SubmitExternalShader("build/expanded/vizfilter.comp", "build/shaders/vizfilter.comp.spv", 1600*900);
-    SubmitExternalShader("build/expanded/switch.comp", "build/shaders/switch.comp.spv", 1600*900);
-    g_shaderbuffer = CreateExternalBuffer("AudioRaySSBOIn", 5000*sizeof(AudioRay));
+    SubmitExternalShader("build/expanded/audioviz.comp", "build/shaders/audioviz.comp.spv", NUMRAYS);
+    //SubmitExternalShader("build/expanded/vizfilter.comp", "build/shaders/vizfilter.comp.spv", OVERRIDE_W*OVERRIDE_H);
+    SubmitExternalShader("build/expanded/switch.comp", "build/shaders/switch.comp.spv", OVERRIDE_W*OVERRIDE_H);
+    g_shaderbuffer = CreateExternalBuffer("AudioRaySSBOIn", NUMRAYS*sizeof(AuthoredRay));
     InitializeApplication("Echo Example", "See you, Space Cowboy");
     AddScene(GenerateMainScene());
     SetScene("Main");

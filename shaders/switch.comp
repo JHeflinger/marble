@@ -10,7 +10,16 @@ void main() {
     if (color.a == 1.0) {
         imageStore(outputImage, ivec2(rx, ry), vec4(color.xyz * 0.1, 1));
     } else {
-        color.a = 1.0;
-        imageStore(outputImage, ivec2(rx, ry), color);
+        vec3 mask = vec3(1.5);
+        float mixy = 1.0;
+        if (color.a > 0.1) {
+            mask = vec3(1.0);
+            mixy = (color.a - 0.1) / 0.1;
+        } else {
+            mask = vec3(1, 0.1, 0.1);
+            mixy = color.a / 0.1;
+        }
+        vec4 finalcolor = mix(vec4(color.xyz * 0.1, 1), vec4(color.xyz * mask, 1), mixy);
+        imageStore(outputImage, ivec2(rx, ry), finalcolor);
     }
 }

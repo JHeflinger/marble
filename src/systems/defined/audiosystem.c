@@ -4,6 +4,7 @@
 #include "game/world.h"
 #include "util/bvh.h"
 #include "audio/dsp.h"
+#include "audio/mic.h"
 #include <raymath.h>
 #include <math.h>
 
@@ -308,6 +309,7 @@ void CleanAudioSystem(System* system) {
     ARRLIST_MetaTriangle_clear(&g_audio_triangles);
     SpatialShutdown();
     CloseAudioDevice();
+    CloseMic();
     g_audio_init = FALSE;
 }
 
@@ -315,6 +317,7 @@ System* GenerateAudioSystem() {
     if (!g_audio_init) {
         g_audio_init = TRUE;
         InitAudioDevice();
+        InitMic();
     }
     return GenerateSystem(NULL, UpdateAudioSystem, NULL, NULL, NULL, NULL, CleanAudioSystem);
 }

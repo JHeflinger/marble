@@ -15,6 +15,7 @@ INCLUDE prism/vendor/suitesparse/include
 INCLUDE prism/vendor/assimp/include
 INCLUDE prism/vendor/nfd/include
 INCLUDE vendor/steamaudio/include
+INCLUDE vendor/miniaudio
 WINDOWS INCLUDE prism/platform/windows/vulkan/include
 WINDOWS INCLUDE prism/platform/windows/GLFW/include
 LINK stdc++
