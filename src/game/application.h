@@ -23,7 +23,7 @@ typedef struct {
     #endif
 } Application;
 
-void InitializeApplication(const char* name, const char* goodbye);
+void InitializeApplication(const char* name, const char* goodbye, BOOL dev);
 
 void DestroyApplication();
 

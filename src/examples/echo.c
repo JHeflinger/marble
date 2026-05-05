@@ -21,7 +21,8 @@ static ShaderBuffer* g_shaderbuffer = NULL;
 static Entity g_terrain;
 static Entity g_player;
 static Entity g_enemy;
-static BOOL g_start = FALSE;
+static BOOL g_start = TRUE;
+static Texture2D g_title_texture = { 0 };
 
 typedef struct {
     alignas(16) vec3 position;
@@ -32,10 +33,6 @@ typedef struct {
 } AuthoredRay;
 
 AIStatus UpdateEnemyPath(void* ctx, BlackBoard* blackboard) {
-    if (IsKeyPressed(KEY_P)) {
-        g_start = TRUE;
-        BlackBoardSetBool(blackboard, "Reset", TRUE);
-    }
     if (!g_start) return AI_FAILURE;
     BlackBoardSetInt(blackboard, "Count", BlackBoardGetInt(blackboard, "Count") + 1);
     if (g_start && BlackBoardGetInt(blackboard, "Count")%30 == 0) BlackBoardSetBool(blackboard, "Reset", TRUE);
@@ -43,12 +40,12 @@ AIStatus UpdateEnemyPath(void* ctx, BlackBoard* blackboard) {
     if (reset) {
         BlackBoardSetInt(blackboard, "Index", 0);
         BlackBoardSetBool(blackboard, "Reset", FALSE);
-        for (TriangleID i = g_navigation.start; i < g_navigation.end; i++)
-            TriangleReference(i)->material = 1;
+        //for (TriangleID i = g_navigation.start; i < g_navigation.end; i++) // INFO: uncomment these if you want to see the nav mesh pathing
+        //    TriangleReference(i)->material = 1;
         Navigate(g_enemy, *(EntityPosition(g_player)));
         NavigationComponent* nc = GetComponent(g_enemy, NavigationComponent);
-        for (size_t i = 0; i < nc->path.size; i++)
-            TriangleReference(nc->mesh.start + nc->path.data[i])->material = 2;
+        //for (size_t i = 0; i < nc->path.size; i++)
+        //    TriangleReference(nc->mesh.start + nc->path.data[i])->material = 2;
         UpdateTriangles();
     }
     return AI_SUCCESS;
@@ -61,6 +58,7 @@ AIStatus FollowEnemyPath(void* ctx, BlackBoard* blackboard) {
     int path_size = (int)nc->path.size;
     Vector3 toplayer = Vector3Subtract(*(EntityPosition(g_player)), *(EntityPosition(g_enemy)));
     if (path_size == 1 || Vector3Length(toplayer) < 5.0f) {
+        ghost_speed = 8.0f;
         toplayer.y = 0;
         toplayer = Vector3Normalize(toplayer);
         EntityRotation(g_enemy)->y = (atan2(toplayer.x, toplayer.z) * RAD2DEG) - 90.0f;
@@ -229,7 +227,7 @@ Scene* GenerateMainScene() {
     // pacman
     g_player = CreateEntityP(world, -30.0f, 5.5f, 0.0f);
     AddComponent(g_player, MeshComponent, UploadGeometry("resources/models/pacman/pacman.obj"));
-    AddComponent(g_player, CameraComponent, FALSE, {0,0,0}, {0,0,0});
+    AddComponent(g_player, CameraComponent, TRUE, {0,0,0}, {0,0,0});
     AddComponent(g_player, AudioListenerComponent, 20);
     AddComponent(g_player, DynamicCollisionComponent, FALSE, {0,0,0}, BOX_COLLIDER);
     *(EntityScale(g_player)) = (Vector3){ 0.75f, 0.75f, 0.75f };
@@ -270,14 +268,37 @@ Scene* GenerateMainScene() {
     return scene;
 }
 
+void UpdateTitleScene(World* world, float dt) {
+    if (IsKeyPressed(KEY_P)) {
+        SetScene("Main");
+    }
+}
+
+void CleanTitleScene(World* world) {
+    UnloadTexture(g_title_texture);
+}
+
+Scene* GenerateTitleScene() {
+    Scene* scene = GenerateScene("Title");
+    World* world = GenerateWorld(NULL, UpdateTitleScene, NULL, NULL, NULL, NULL, CleanTitleScene);
+    AddWorld(scene, world);
+    AddSystem(world, GenerateDrawSystem());
+    g_title_texture = LoadTexture("resources/images/titlescreen.png");
+    Entity e = CreateEntityP(world, 800, 450, 0);
+    *(EntityScale(e)) = (Vector3){ 1600, 900, 0 };
+    AddComponent(e, ImageComponent, g_title_texture);
+    return scene;
+}
+
 void EchoMain() {
-    //SubmitExternalShader("build/expanded/audioviz.comp", "build/shaders/audioviz.comp.spv", NUMRAYS);
-    //SubmitExternalShader("build/expanded/vizfilter.comp", "build/shaders/vizfilter.comp.spv", OVERRIDE_W*OVERRIDE_H);
-    //SubmitExternalShader("build/expanded/switch.comp", "build/shaders/switch.comp.spv", OVERRIDE_W*OVERRIDE_H);
+    SubmitExternalShader("build/expanded/audioviz.comp", "build/shaders/audioviz.comp.spv", NUMRAYS);
+    SubmitExternalShader("build/expanded/vizfilter.comp", "build/shaders/vizfilter.comp.spv", OVERRIDE_W*OVERRIDE_H);
+    SubmitExternalShader("build/expanded/switch.comp", "build/shaders/switch.comp.spv", OVERRIDE_W*OVERRIDE_H);
     g_shaderbuffer = CreateExternalBuffer("AudioRaySSBOIn", NUMRAYS*sizeof(AuthoredRay));
-    InitializeApplication("Echo Example", "See you, Space Cowboy");
+    InitializeApplication("Echo Example", "See you, Space Cowboy", FALSE);
     AddScene(GenerateMainScene());
-    SetScene("Main");
+    AddScene(GenerateTitleScene());
+    SetScene("Title");
     RunApplication();
     DestroyApplication();
 }

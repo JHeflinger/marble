@@ -6,6 +6,16 @@
 #include <renderer/renderer.h>
 #include <raymath.h>
 
+void DrawImageComponent(Entity e, Vector2 origin) {
+    ImageComponent* ic = GetComponent(e, ImageComponent);
+    TransformComponent* tc = GetComponent(e, TransformComponent);
+    DrawTexturePro(
+        ic->texture,
+        (Rectangle){0, 0, ic->texture.width, ic->texture.height},
+        (Rectangle){tc->translation.x - tc->scale.x/2.0f, tc->translation.y - tc->scale.y/2.0f, tc->scale.x, tc->scale.y},
+        (Vector2){0, 0}, 0, WHITE);
+}
+
 void DrawTextComponent(Entity e, Vector2 origin) {
     TextComponent* tc = GetComponent(e, TextComponent);
     Font default_font = GetFontDefault();
@@ -104,6 +114,13 @@ void DrawDrawSystem(System* system) {
     BeginTextureMode(target);
     Draw(0, 0, slice.x, slice.y);
     Vector2 image_origin = (Vector2){ slice.x / 2.0f - target.texture.width / 2.0f, slice.y / 2.0f - target.texture.height / 2.0f };
+    ARRLIST_EntityID* image_entities = GetEntities(system->context, ImageComponent);
+    if (image_entities) {
+        for (size_t i = 0; i < image_entities->size; i++) {
+            Entity e = (Entity){ image_entities->data[i], system->context };
+            DrawImageComponent(e, image_origin);
+        }
+    }
     ARRLIST_EntityID* text_entities = GetEntities(system->context, TextComponent);
     if (text_entities) {
         for (size_t i = 0; i < text_entities->size; i++) {

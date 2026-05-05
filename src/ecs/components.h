@@ -39,6 +39,10 @@ EXPOSE_COMPONENT(TagComponent) {
     const char* tag;
 };
 
+EXPOSE_COMPONENT(ImageComponent) {
+    Texture2D texture;
+};
+
 EXPOSE_COMPONENT(TransformComponent) {
     Vector3 translation;
     Vector3 rotation;

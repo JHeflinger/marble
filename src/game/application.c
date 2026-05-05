@@ -139,8 +139,8 @@ void DrawApplication() {
 void InitializeEngineMaterials() {
     SubmitNamedMaterial((SurfaceMaterial){
         {0.0f, 0.0f, 0.0f},
-        {0.0f, 1.0f, 0.0f},
-        {0.0f, 1.0f, 0.0f},
+        {0.1f, 0.1f, 0.1f},
+        {0.6f, 0.3f, 0.0f},
         {0.0f, 0.0f, 0.0f},
         {0.0f, 0.0f, 0.0f},
         {0.0f, 0.0f, 0.0f},
@@ -157,7 +157,7 @@ void InitializeEngineMaterials() {
     }, "Attention");
 }
 
-void InitializeApplication(const char* name, const char* goodbye) {
+void InitializeApplication(const char* name, const char* goodbye, BOOL dev) {
     #ifndef PROD_BUILD
     g_application.memory = EZ_ALLOCATED();
     #endif
@@ -173,25 +173,30 @@ void InitializeApplication(const char* name, const char* goodbye) {
     InitializeRenderer();
     InitializeEngineMaterials();
     g_application.ui = GenerateUI();
-    g_application.ui->left = GenerateUI();
-    g_application.ui->right = GenerateUI();
-    ((UI*)g_application.ui->right)->right = GenerateUI();
-    ((UI*)g_application.ui->right)->left = GenerateUI();
-    ((UI*)g_application.ui->right)->divide = GetScreenHeight() - 560;
-    ((UI*)g_application.ui->right)->vertical = TRUE;
-    ((UI*)g_application.ui->left)->right = GenerateUI();
-    ((UI*)g_application.ui->left)->left = GenerateUI();
-    ((UI*)((UI*)g_application.ui->left)->left)->left = GenerateUI();
-    ((UI*)((UI*)g_application.ui->left)->left)->right = GenerateUI();
-    ((UI*)((UI*)g_application.ui->left)->left)->divide = GetScreenHeight() - 420;
-    ((UI*)((UI*)g_application.ui->left)->left)->vertical = TRUE;
-    ((UI*)g_application.ui->left)->divide = 350;
-    ARRLIST_Panel_add(&(((UI*)(((UI*)g_application.ui->right)->right))->panels), GenerateDiagnosticsPanel());
-    ARRLIST_Panel_add(&(((UI*)(((UI*)g_application.ui->right)->left))->panels), GenerateOverviewPanel());
-    ARRLIST_Panel_add(&(((UI*)(((UI*)g_application.ui->left)->right))->panels), GenerateEViewportPanel());
-    ARRLIST_Panel_add(&(GetLeftUI(GetLeftUI(GetLeftUI(g_application.ui)))->panels), GenerateEditPanel());
-    ARRLIST_Panel_add(&(GetRightUI(GetLeftUI(GetLeftUI(g_application.ui)))->panels), GenerateGraphPanel());
-    g_application.ui->divide = 1250;
+    if (dev) {
+        g_application.ui->left = GenerateUI();
+        g_application.ui->right = GenerateUI();
+        ((UI*)g_application.ui->right)->right = GenerateUI();
+        ((UI*)g_application.ui->right)->left = GenerateUI();
+        ((UI*)g_application.ui->right)->divide = GetScreenHeight() - 560;
+        ((UI*)g_application.ui->right)->vertical = TRUE;
+        ((UI*)g_application.ui->left)->right = GenerateUI();
+        ((UI*)g_application.ui->left)->left = GenerateUI();
+        ((UI*)((UI*)g_application.ui->left)->left)->left = GenerateUI();
+        ((UI*)((UI*)g_application.ui->left)->left)->right = GenerateUI();
+        ((UI*)((UI*)g_application.ui->left)->left)->divide = GetScreenHeight() - 420;
+        ((UI*)((UI*)g_application.ui->left)->left)->vertical = TRUE;
+        ((UI*)g_application.ui->left)->divide = 350;
+        ARRLIST_Panel_add(&(((UI*)(((UI*)g_application.ui->right)->right))->panels), GenerateDiagnosticsPanel());
+        ARRLIST_Panel_add(&(((UI*)(((UI*)g_application.ui->right)->left))->panels), GenerateOverviewPanel());
+        ARRLIST_Panel_add(&(((UI*)(((UI*)g_application.ui->left)->right))->panels), GenerateEViewportPanel());
+        ARRLIST_Panel_add(&(GetLeftUI(GetLeftUI(GetLeftUI(g_application.ui)))->panels), GenerateEditPanel());
+        ARRLIST_Panel_add(&(GetRightUI(GetLeftUI(GetLeftUI(g_application.ui)))->panels), GenerateGraphPanel());
+        g_application.ui->divide = 1250;
+    } else {
+        ARRLIST_Panel_add(&(g_application.ui->panels), GenerateEViewportPanel());
+        SetPipelineFlags(PATHTRACE_PIPELINE_FLAGS);
+    }
     SetPrimaryUI(g_application.ui);
     DevInitialize();
 }

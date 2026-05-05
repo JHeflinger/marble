@@ -149,7 +149,7 @@ Scene* GenerateMazeScene() {
 }
 
 void GhostsMain() {
-    InitializeApplication("Ghosts Example", "See you, Space Cowboy");
+    InitializeApplication("Ghosts Example", "See you, Space Cowboy", TRUE);
     AddScene(GenerateMazeScene());
     SetScene("Maze");
     RunApplication();
