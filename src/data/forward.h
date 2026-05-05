@@ -13,5 +13,6 @@ FORWARD_DECLARE(World);
 FORWARD_DECLARE(Entity);
 FORWARD_DECLARE(System);
 FORWARD_DECLARE(BehaviorNode);
+FORWARD_DECLARE(NavigationComponent);
 
 #endif

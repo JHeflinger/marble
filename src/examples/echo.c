@@ -2,6 +2,7 @@
 #include "systems/defined/drawsystem.h"
 #include "systems/defined/audiosystem.h"
 #include "systems/defined/collisionsystem.h"
+#include "systems/defined/aisystem.h"
 #include "game/application.h"
 #include "ecs/components.h"
 #include "ecs/entity.h"
@@ -15,10 +16,12 @@
 #define NUMRAYS 20000
 #define RPR 1000
 
-ShaderBuffer* g_shaderbuffer = NULL;
-Entity g_terrain;
-Entity g_player;
-Entity g_enemy;
+static NavigationMesh g_navigation;
+static ShaderBuffer* g_shaderbuffer = NULL;
+static Entity g_terrain;
+static Entity g_player;
+static Entity g_enemy;
+static BOOL g_start = FALSE;
 
 typedef struct {
     alignas(16) vec3 position;
@@ -28,6 +31,87 @@ typedef struct {
     alignas(4) float fade;
 } AuthoredRay;
 
+AIStatus UpdateEnemyPath(void* ctx, BlackBoard* blackboard) {
+    if (IsKeyPressed(KEY_P)) {
+        g_start = TRUE;
+        BlackBoardSetBool(blackboard, "Reset", TRUE);
+    }
+    if (!g_start) return AI_FAILURE;
+    BlackBoardSetInt(blackboard, "Count", BlackBoardGetInt(blackboard, "Count") + 1);
+    if (g_start && BlackBoardGetInt(blackboard, "Count")%30 == 0) BlackBoardSetBool(blackboard, "Reset", TRUE);
+    BOOL reset = BlackBoardGetBool(blackboard, "Reset");
+    if (reset) {
+        BlackBoardSetInt(blackboard, "Index", 0);
+        BlackBoardSetBool(blackboard, "Reset", FALSE);
+        for (TriangleID i = g_navigation.start; i < g_navigation.end; i++)
+            TriangleReference(i)->material = 1;
+        Navigate(g_enemy, *(EntityPosition(g_player)));
+        NavigationComponent* nc = GetComponent(g_enemy, NavigationComponent);
+        for (size_t i = 0; i < nc->path.size; i++)
+            TriangleReference(nc->mesh.start + nc->path.data[i])->material = 2;
+        UpdateTriangles();
+    }
+    return AI_SUCCESS;
+}
+
+AIStatus FollowEnemyPath(void* ctx, BlackBoard* blackboard) {
+    float ghost_speed = 2.0f;
+    int index = BlackBoardGetInt(blackboard, "Index");
+    NavigationComponent* nc = GetComponent(g_enemy, NavigationComponent);
+    int path_size = (int)nc->path.size;
+    Vector3 toplayer = Vector3Subtract(*(EntityPosition(g_player)), *(EntityPosition(g_enemy)));
+    if (path_size == 1 || Vector3Length(toplayer) < 5.0f) {
+        toplayer.y = 0;
+        toplayer = Vector3Normalize(toplayer);
+        EntityRotation(g_enemy)->y = (atan2(toplayer.x, toplayer.z) * RAD2DEG) - 90.0f;
+        toplayer = Vector3Scale(toplayer, ghost_speed * GetFrameTime());
+        *(EntityPosition(g_enemy)) = Vector3Add(*(EntityPosition(g_enemy)), toplayer);
+        return AI_RUNNING;
+    }
+    if (index >= path_size) return AI_SUCCESS;
+    BOOL at_last = (index + 1 >= path_size);
+    Vector3 steering_target;
+    if (at_last) {
+        steering_target = nc->mesh.polys[nc->path.data[index]].centroid;
+    } else {
+        Vector3 ep1, ep2;
+        if (!GetSharedEdge(nc, index, &ep1, &ep2)) {
+            BlackBoardSetInt(blackboard, "Index", index + 1);
+            return AI_RUNNING;
+        }
+        steering_target = (Vector3){
+            (ep1.x + ep2.x) * 0.5f,
+            (ep1.y + ep2.y) * 0.5f,
+            (ep1.z + ep2.z) * 0.5f
+        };
+    }
+    Vector3* ghost_pos = EntityPosition(g_enemy);
+    float dx = steering_target.x - ghost_pos->x;
+    float dz = steering_target.z - ghost_pos->z;
+    float len = sqrtf(dx * dx + dz * dz);
+    if (len > 0.0001f) {
+        Vector2 dir = { dx / len, dz / len };
+        ghost_pos->x += dir.x * ghost_speed * GetFrameTime();
+        ghost_pos->z += dir.y * ghost_speed * GetFrameTime();
+        float newrot = (atan2(dir.x, dir.y) * RAD2DEG) - 90.0f;
+        EntityRotation(g_enemy)->y += (newrot - EntityRotation(g_enemy)->y) / 10.0f;
+    }
+    if (at_last) {
+        if (len < 0.3f) {
+            BlackBoardSetInt(blackboard, "Index", index + 1);
+            return AI_SUCCESS;
+        }
+    } else {
+        Vector3 ep1, ep2;
+        GetSharedEdge(nc, index, &ep1, &ep2);
+        Vector3 current_centroid = nc->mesh.polys[nc->path.data[index]].centroid;
+        if (HasCrossedEdge(*ghost_pos, ep1, ep2, current_centroid)) {
+            BlackBoardSetInt(blackboard, "Index", index + 1);
+        }
+    }
+    return AI_RUNNING;
+}
+
 void UpdateMainScene(World* scene, float dt) {
     CameraComponent* cc = GetComponent(g_player, CameraComponent);
     MeshDescriptor* md = MeshReference(GetComponent(g_player, MeshComponent)->id);
@@ -36,7 +120,6 @@ void UpdateMainScene(World* scene, float dt) {
         cc->enabled = !cc->enabled;
     }
     if (cc->enabled) {
-        MoveFlatEntityFPV(g_enemy, (Vector3){1.0f * dt, 0.0f, 0.0f});
         md->disabled = TRUE;
         Vector3 translate = { 0 };
         if (IsKeyDown(KEY_D)) translate.x += dt * 10.0f;
@@ -63,7 +146,7 @@ void UpdateMainScene(World* scene, float dt) {
         AuthoredRay* rays = (AuthoredRay*)g_shaderbuffer->data;
         int rotations = NUMRAYS/(2 * RPR);
         rays[i].fade -= GetFrameTime() / ((float)rotations * fadeaway);
-        if (rays[i].fade < 0) rays[i].fade = 0;
+        if (rays[i].fade < 0.0f) rays[i].fade = 0.0f;
     }
     if (timer > fadeaway) {
         timer = 0.0f;
@@ -109,6 +192,7 @@ Scene* GenerateMainScene() {
     AddSystem(world, GenerateDrawSystem());
     AddSystem(world, GenerateAudioSystem());
     AddSystem(world, GenerateCollisionSystem());
+    AddSystem(world, GenerateAISystem());
 
     Music ambient = LoadMusicStream("resources/sounds/ghost.mp3");
     ambient.looping = true;
@@ -124,6 +208,10 @@ Scene* GenerateMainScene() {
 
     // maze collision
     LoadBoxColliders(world, "resources/data/colliders.json");
+
+    // navmesh
+    g_navigation = UploadNavigationMesh("resources/navigation/maze.obj");
+    AddComponent(CreateEntity(world), NavigationComponent, g_navigation, { 0 });
 
     // lights
     float lval = 0.05f;
@@ -153,7 +241,20 @@ Scene* GenerateMainScene() {
     SpatialSource* spatial = SpatialCreateSource();
     AddComponent(g_enemy, MeshComponent, UploadGeometry("resources/models/ghost/ghost.obj"));
     AddComponent(g_enemy, AudioSourceComponent, ambient, dsp, spatial);
-    AddComponent(g_enemy, StaticCollisionComponent, FALSE, BOX_COLLIDER);
+    //AddComponent(g_enemy, DynamicCollisionComponent, FALSE, {0,0,0}, BOX_COLLIDER);
+    AddComponent(g_enemy, NavigationComponent, DuplicateNavigationMesh(g_navigation), { 0 });
+
+    // ghost ai
+    BehaviorNode* follow_sequence[] = {
+        BehaviorAction(UpdateEnemyPath, NULL),
+        BehaviorAction(FollowEnemyPath, NULL)
+    };
+    BehaviorNode* root = BehaviorSequence(follow_sequence, 2);
+    BlackBoard emptybb = { 0 };
+    BlackBoardSetBool(&emptybb, "Reset", TRUE);
+    BlackBoardSetInt(&emptybb, "Index", 0);
+    BlackBoardSetInt(&emptybb, "Count", 0);
+    AddComponent(g_enemy, AIComponent, emptybb, root);
 
     // todo: make less ugly with extern lines
     extern DSPState* g_audio_dsp;

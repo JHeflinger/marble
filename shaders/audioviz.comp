@@ -116,7 +116,7 @@ vec2 back_propogate(vec3 point) {
 
 float raycid(uint color, float fade) {
     if (color == 1) return 0.1 * fade;
-    return 0.1 * fade + 0.1;
+    return (0.1 * fade) + 0.1;
 }
 
 void splat_point(float fade, uint author, uint cid, Hit h, vec3 incoming) {
