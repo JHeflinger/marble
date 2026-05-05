@@ -241,7 +241,7 @@ Scene* GenerateMainScene() {
     SpatialSource* spatial = SpatialCreateSource();
     AddComponent(g_enemy, MeshComponent, UploadGeometry("resources/models/ghost/ghost.obj"));
     AddComponent(g_enemy, AudioSourceComponent, ambient, dsp, spatial);
-    //AddComponent(g_enemy, DynamicCollisionComponent, FALSE, {0,0,0}, BOX_COLLIDER);
+    AddComponent(g_enemy, DynamicCollisionComponent, FALSE, {0,0,0}, BOX_COLLIDER);
     AddComponent(g_enemy, NavigationComponent, DuplicateNavigationMesh(g_navigation), { 0 });
 
     // ghost ai
@@ -271,9 +271,9 @@ Scene* GenerateMainScene() {
 }
 
 void EchoMain() {
-    SubmitExternalShader("build/expanded/audioviz.comp", "build/shaders/audioviz.comp.spv", NUMRAYS);
+    //SubmitExternalShader("build/expanded/audioviz.comp", "build/shaders/audioviz.comp.spv", NUMRAYS);
     //SubmitExternalShader("build/expanded/vizfilter.comp", "build/shaders/vizfilter.comp.spv", OVERRIDE_W*OVERRIDE_H);
-    SubmitExternalShader("build/expanded/switch.comp", "build/shaders/switch.comp.spv", OVERRIDE_W*OVERRIDE_H);
+    //SubmitExternalShader("build/expanded/switch.comp", "build/shaders/switch.comp.spv", OVERRIDE_W*OVERRIDE_H);
     g_shaderbuffer = CreateExternalBuffer("AudioRaySSBOIn", NUMRAYS*sizeof(AuthoredRay));
     InitializeApplication("Echo Example", "See you, Space Cowboy");
     AddScene(GenerateMainScene());

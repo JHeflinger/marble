@@ -200,5 +200,5 @@ BOOL HasCrossedEdge(Vector3 pos, Vector3 ep1, Vector3 ep2, Vector3 from_centroid
     float to_cent_z = from_centroid.z - ep1.z;
     float cross_pos = edge_dx * to_pos_z - edge_dz * to_pos_x;
     float cross_cent = edge_dx * to_cent_z - edge_dz * to_cent_x;
-    return (cross_pos * cross_cent) <= 0.0f;
+    return (cross_pos * cross_cent) <= 0.1f;
 }
