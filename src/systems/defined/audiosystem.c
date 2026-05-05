@@ -26,22 +26,19 @@ BOOL g_audio_init = FALSE;
 DECLARE_ARRLIST(Tap);
 IMPL_ARRLIST(Tap);
 
-DSPState* g_audio_dsp = NULL;
-SpatialSource* g_audio_spatial = NULL;
-unsigned int g_audio_channels = 1; // make 2 later
+DSPState* g_audio_dsps[3] = { 0 };
+SpatialSource* g_audio_spatials[3] = { 0 };
+unsigned int g_audio_channels = 1;
 
 static float g_mono_scratch[MAX_FRAMES_PER_CALLBACK];
 static float g_stereo_scratch[MAX_FRAMES_PER_CALLBACK * 2];
 
-void DSPProcessorCallback(void* buffer, unsigned int frames) {
-    if (!g_audio_dsp || frames > MAX_FRAMES_PER_CALLBACK) return;
+static void DSPProcessorCallbackImpl(void* buffer, unsigned int frames, int idx) {
+    DSPState* dsp = g_audio_dsps[idx];
+    SpatialSource* spatial = g_audio_spatials[idx];
+    if (!dsp || frames > MAX_FRAMES_PER_CALLBACK) return;
 
     float* samples = (float*)buffer;
-
-    float input_max = 0.0f;
-    for (unsigned int f = 0; f < frames * g_audio_channels; f++) {
-        if (fabsf(samples[f]) > input_max) input_max = fabsf(samples[f]);
-    }
 
     for (unsigned int f = 0; f < frames; f++) {
         float sum = 0.0f;
@@ -51,29 +48,12 @@ void DSPProcessorCallback(void* buffer, unsigned int frames) {
         g_mono_scratch[f] = sum / (float)g_audio_channels;
     }
 
-    float pre_dsp_max = 0.0f;
-    for (unsigned int f = 0; f < frames; f++) {
-        if (fabsf(g_mono_scratch[f]) > pre_dsp_max) pre_dsp_max = fabsf(g_mono_scratch[f]);
-    }
+    DSPProcess(dsp, g_mono_scratch, frames);
 
-    DSPProcess(g_audio_dsp, g_mono_scratch, frames);
-
-    float post_dsp_max = 0.0f;
-    for (unsigned int f = 0; f < frames; f++) {
-        if (fabsf(g_mono_scratch[f]) > post_dsp_max) post_dsp_max = fabsf(g_mono_scratch[f]);
-    }
-
-    if (g_audio_spatial) {
+    if (spatial) {
         float dirX, dirY, dirZ;
-        DSPGetDirection(g_audio_dsp, &dirX, &dirY, &dirZ);
-
-        SpatialApply(g_audio_spatial, g_mono_scratch, g_stereo_scratch,
-                     dirX, dirY, dirZ, frames);
-
-        float post_spatial_max = 0.0f;
-        for (unsigned int f = 0; f < frames * 2; f++) {
-            if (fabsf(g_stereo_scratch[f]) > post_spatial_max) post_spatial_max = fabsf(g_stereo_scratch[f]);
-        }
+        DSPGetDirection(dsp, &dirX, &dirY, &dirZ);
+        SpatialApply(spatial, g_mono_scratch, g_stereo_scratch, dirX, dirY, dirZ, frames);
 
         for (unsigned int f = 0; f < frames; f++) {
             for (unsigned int c = 0; c < g_audio_channels; c++) {
@@ -82,6 +62,10 @@ void DSPProcessorCallback(void* buffer, unsigned int frames) {
         }
     }
 }
+
+void DSPProcessorCallback0(void* b, unsigned int f) { DSPProcessorCallbackImpl(b, f, 0); }
+void DSPProcessorCallback1(void* b, unsigned int f) { DSPProcessorCallbackImpl(b, f, 1); }
+void DSPProcessorCallback2(void* b, unsigned int f) { DSPProcessorCallbackImpl(b, f, 2); }
 
 // amplitude function, but might change if we have different materials or source properties
 float TapAmplitude(float pathLength, size_t bounces) {

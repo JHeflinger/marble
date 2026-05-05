@@ -15,14 +15,16 @@
 
 #define NUMRAYS 20000
 #define RPR 1000
+#define NUM_GHOSTS 3
 
 static NavigationMesh g_navigation;
 static ShaderBuffer* g_shaderbuffer = NULL;
 static Entity g_terrain;
 static Entity g_player;
-static Entity g_enemy;
 static BOOL g_start = TRUE;
 static Texture2D g_title_texture = { 0 };
+static Texture2D g_retry_texture = { 0 };
+static Texture2D g_end_texture = { 0 };
 
 typedef struct {
     alignas(16) vec3 position;
@@ -32,7 +34,32 @@ typedef struct {
     alignas(4) float fade;
 } AuthoredRay;
 
+static Vector3 g_player_start = { -30.0f, 5.5f, 0.0f };
+
+static Entity g_enemies[NUM_GHOSTS];
+static Vector3 g_enemy_starts[NUM_GHOSTS] = {
+    { -37.0f, 5.8f,   0.0f },
+    {   0.0f, 5.8f, -37.0f },
+    {   0.0f, 5.8f,  37.0f }
+};
+
+void ResetGame() {
+    *(EntityPosition(g_player)) = g_player_start;
+    *(EntityRotation(g_player)) = (Vector3){ 0.0f, 90.0f * DEG2RAD, 0.0f };
+
+    for (int i = 0; i < NUM_GHOSTS; i++) {
+        *(EntityPosition(g_enemies[i])) = g_enemy_starts[i];
+        *(EntityRotation(g_enemies[i])) = (Vector3){ 0 };
+
+        AIComponent* ai = GetComponent(g_enemies[i], AIComponent);
+        BlackBoardSetBool(&ai->blackboard, "Reset", TRUE);
+        BlackBoardSetInt(&ai->blackboard, "Index", 0);
+        BlackBoardSetInt(&ai->blackboard, "Count", 0);
+    }
+}
+
 AIStatus UpdateEnemyPath(void* ctx, BlackBoard* blackboard) {
+    Entity ghost = *(Entity*)ctx;
     if (!g_start) return AI_FAILURE;
     BlackBoardSetInt(blackboard, "Count", BlackBoardGetInt(blackboard, "Count") + 1);
     if (g_start && BlackBoardGetInt(blackboard, "Count")%30 == 0) BlackBoardSetBool(blackboard, "Reset", TRUE);
@@ -40,30 +67,26 @@ AIStatus UpdateEnemyPath(void* ctx, BlackBoard* blackboard) {
     if (reset) {
         BlackBoardSetInt(blackboard, "Index", 0);
         BlackBoardSetBool(blackboard, "Reset", FALSE);
-        //for (TriangleID i = g_navigation.start; i < g_navigation.end; i++) // INFO: uncomment these if you want to see the nav mesh pathing
-        //    TriangleReference(i)->material = 1;
-        Navigate(g_enemy, *(EntityPosition(g_player)));
-        NavigationComponent* nc = GetComponent(g_enemy, NavigationComponent);
-        //for (size_t i = 0; i < nc->path.size; i++)
-        //    TriangleReference(nc->mesh.start + nc->path.data[i])->material = 2;
+        Navigate(ghost, *(EntityPosition(g_player)));
         UpdateTriangles();
     }
     return AI_SUCCESS;
 }
 
 AIStatus FollowEnemyPath(void* ctx, BlackBoard* blackboard) {
+    Entity ghost = *(Entity*)ctx;
     float ghost_speed = 2.0f;
     int index = BlackBoardGetInt(blackboard, "Index");
-    NavigationComponent* nc = GetComponent(g_enemy, NavigationComponent);
+    NavigationComponent* nc = GetComponent(ghost, NavigationComponent);
     int path_size = (int)nc->path.size;
-    Vector3 toplayer = Vector3Subtract(*(EntityPosition(g_player)), *(EntityPosition(g_enemy)));
+    Vector3 toplayer = Vector3Subtract(*(EntityPosition(g_player)), *(EntityPosition(ghost)));
     if (path_size == 1 || Vector3Length(toplayer) < 5.0f) {
         ghost_speed = 8.0f;
         toplayer.y = 0;
         toplayer = Vector3Normalize(toplayer);
-        EntityRotation(g_enemy)->y = (atan2(toplayer.x, toplayer.z) * RAD2DEG) - 90.0f;
+        EntityRotation(ghost)->y = (atan2(toplayer.x, toplayer.z) * RAD2DEG) - 90.0f;
         toplayer = Vector3Scale(toplayer, ghost_speed * GetFrameTime());
-        *(EntityPosition(g_enemy)) = Vector3Add(*(EntityPosition(g_enemy)), toplayer);
+        *(EntityPosition(ghost)) = Vector3Add(*(EntityPosition(ghost)), toplayer);
         return AI_RUNNING;
     }
     if (index >= path_size) return AI_SUCCESS;
@@ -83,7 +106,7 @@ AIStatus FollowEnemyPath(void* ctx, BlackBoard* blackboard) {
             (ep1.z + ep2.z) * 0.5f
         };
     }
-    Vector3* ghost_pos = EntityPosition(g_enemy);
+    Vector3* ghost_pos = EntityPosition(ghost);
     float dx = steering_target.x - ghost_pos->x;
     float dz = steering_target.z - ghost_pos->z;
     float len = sqrtf(dx * dx + dz * dz);
@@ -92,7 +115,7 @@ AIStatus FollowEnemyPath(void* ctx, BlackBoard* blackboard) {
         ghost_pos->x += dir.x * ghost_speed * GetFrameTime();
         ghost_pos->z += dir.y * ghost_speed * GetFrameTime();
         float newrot = (atan2(dir.x, dir.y) * RAD2DEG) - 90.0f;
-        EntityRotation(g_enemy)->y += (newrot - EntityRotation(g_enemy)->y) / 10.0f;
+        EntityRotation(ghost)->y += (newrot - EntityRotation(ghost)->y) / 10.0f;
     }
     if (at_last) {
         if (len < 0.3f) {
@@ -111,6 +134,21 @@ AIStatus FollowEnemyPath(void* ctx, BlackBoard* blackboard) {
 }
 
 void UpdateMainScene(World* scene, float dt) {
+    for (int i = 0; i < NUM_GHOSTS; i++) {
+        Vector3 to_ghost = Vector3Subtract(*(EntityPosition(g_enemies[i])), *(EntityPosition(g_player)));
+        if (Vector3Length(to_ghost) < 1.5f) {
+            SetScene("GameOver");
+            return;
+        }
+    }
+
+    Vector3 goal = { -39.0f, 5.8f, 0.0f }; // end of maze
+    Vector3 to_goal = Vector3Subtract(goal, *(EntityPosition(g_player)));
+    if (Vector3Length(to_goal) < 1.5f) {
+        SetScene("End");
+        return;
+    }
+
     CameraComponent* cc = GetComponent(g_player, CameraComponent);
     MeshDescriptor* md = MeshReference(GetComponent(g_player, MeshComponent)->id);
     if (IsKeyPressed(KEY_P)) {
@@ -132,8 +170,11 @@ void UpdateMainScene(World* scene, float dt) {
     } else {
         md->disabled = FALSE;
     }
-    AudioSourceComponent* asc = GetComponent(g_enemy, AudioSourceComponent);
-    if (asc) UpdateMusicStream(asc->music);
+
+    for (int i = 0; i < NUM_GHOSTS; i++) {
+        AudioSourceComponent* asc = GetComponent(g_enemies[i], AudioSourceComponent);
+        if (asc) UpdateMusicStream(asc->music);
+    }
 
     // update audio rays
     static float timer = 0.0f;
@@ -149,8 +190,7 @@ void UpdateMainScene(World* scene, float dt) {
     if (timer > fadeaway) {
         timer = 0.0f;
         rotation = (rotation + 1)%(NUMRAYS/(2 * RPR));
-        size_t mid = GetComponent(g_enemy, MeshComponent)->id;
-        inline void fibbyrays(AuthoredRay* rays, size_t count, Vector3 p, float level, uint32_t color) {
+        inline void fibbyrays(AuthoredRay* rays, size_t count, Vector3 p, float level, uint32_t color, size_t mid) {
             const float golden_angle = GLM_PI * (sqrtf(5.0f) - 1.0f);
             vec3 origin = { p.x, p.y, p.z };
             for (size_t i = 0; i < count; i++) {
@@ -173,8 +213,15 @@ void UpdateMainScene(World* scene, float dt) {
                 rays[i].fade = 1.0f;
             }
         }
-        fibbyrays(g_shaderbuffer->data + (rotation * RPR * sizeof(AuthoredRay)), RPR, *(EntityPosition(g_enemy)), 1.0f, 1);
-        fibbyrays(g_shaderbuffer->data + ((NUMRAYS/2) * sizeof(AuthoredRay)) + (rotation * RPR * sizeof(AuthoredRay)), RPR, *(EntityPosition(g_player)), fmin(pow(MicVolume(), 3.0f) * 40.0f, 1.0f), 0);
+
+        size_t ghost_rpr = RPR / NUM_GHOSTS;
+        for (int g = 0; g < NUM_GHOSTS; g++) {
+            size_t mid = GetComponent(g_enemies[g], MeshComponent)->id;
+            fibbyrays(g_shaderbuffer->data + (rotation * RPR * sizeof(AuthoredRay)) + (g * ghost_rpr * sizeof(AuthoredRay)),
+                      ghost_rpr, *(EntityPosition(g_enemies[g])), 1.0f, 1, mid);
+        }
+        size_t player_mid = GetComponent(g_player, MeshComponent)->id;
+        fibbyrays(g_shaderbuffer->data + ((NUMRAYS/2) * sizeof(AuthoredRay)) + (rotation * RPR * sizeof(AuthoredRay)), RPR, *(EntityPosition(g_player)), fmin(pow(MicVolume(), 3.0f) * 40.0f, 1.0f), 0, player_mid);
     }
     UpdateShaderBuffer(g_shaderbuffer);
 }
@@ -225,7 +272,7 @@ Scene* GenerateMainScene() {
     AddComponent(CreateEntity(world), LightComponent, l5);
 
     // pacman
-    g_player = CreateEntityP(world, -30.0f, 5.5f, 0.0f);
+    g_player = CreateEntityP(world, 37.0f, 5.5f, 0.0f);
     AddComponent(g_player, MeshComponent, UploadGeometry("resources/models/pacman/pacman.obj"));
     AddComponent(g_player, CameraComponent, TRUE, {0,0,0}, {0,0,0});
     AddComponent(g_player, AudioListenerComponent, 20);
@@ -233,37 +280,49 @@ Scene* GenerateMainScene() {
     *(EntityScale(g_player)) = (Vector3){ 0.75f, 0.75f, 0.75f };
     *(EntityRotation(g_player)) = (Vector3){ 0.0f, 90.0f * DEG2RAD, 0.0f };
 
-    // ghost
-    g_enemy = CreateEntityP(world, -37.0f, 5.8f, 0.0f);
-    DSPState* dsp = DSPInit(ambient.stream.sampleRate, 2.0f);
-    SpatialSource* spatial = SpatialCreateSource();
-    AddComponent(g_enemy, MeshComponent, UploadGeometry("resources/models/ghost/ghost.obj"));
-    AddComponent(g_enemy, AudioSourceComponent, ambient, dsp, spatial);
-    AddComponent(g_enemy, DynamicCollisionComponent, FALSE, {0,0,0}, BOX_COLLIDER);
-    AddComponent(g_enemy, NavigationComponent, DuplicateNavigationMesh(g_navigation), { 0 });
-
-    // ghost ai
-    BehaviorNode* follow_sequence[] = {
-        BehaviorAction(UpdateEnemyPath, NULL),
-        BehaviorAction(FollowEnemyPath, NULL)
-    };
-    BehaviorNode* root = BehaviorSequence(follow_sequence, 2);
-    BlackBoard emptybb = { 0 };
-    BlackBoardSetBool(&emptybb, "Reset", TRUE);
-    BlackBoardSetInt(&emptybb, "Index", 0);
-    BlackBoardSetInt(&emptybb, "Count", 0);
-    AddComponent(g_enemy, AIComponent, emptybb, root);
-
-    // todo: make less ugly with extern lines
-    extern DSPState* g_audio_dsp;
-    extern SpatialSource* g_audio_spatial;
+    SpatialInit(ambient.stream.sampleRate, 1);
     extern unsigned int g_audio_channels;
-    extern void DSPProcessorCallback(void* buffer, unsigned int frames);
-    g_audio_dsp = dsp;
-    g_audio_spatial = spatial;
     g_audio_channels = ambient.stream.channels;
-    AttachAudioStreamProcessor(ambient.stream, DSPProcessorCallback);
-    PlayMusicStream(ambient);
+    extern DSPState* g_audio_dsps[];
+    extern SpatialSource* g_audio_spatials[];
+    extern void DSPProcessorCallback0(void*, unsigned int);
+    extern void DSPProcessorCallback1(void*, unsigned int);
+    extern void DSPProcessorCallback2(void*, unsigned int);
+    void (*callbacks[])(void*, unsigned int) = {
+        DSPProcessorCallback0, DSPProcessorCallback1, DSPProcessorCallback2
+    };
+
+    // ghosts
+    for (int i = 0; i < NUM_GHOSTS; i++) {
+        g_enemies[i] = CreateEntityP(world, g_enemy_starts[i].x, g_enemy_starts[i].y, g_enemy_starts[i].z);
+        AddComponent(g_enemies[i], MeshComponent, UploadGeometry("resources/models/ghost/ghost.obj"));
+        AddComponent(g_enemies[i], DynamicCollisionComponent, FALSE, {0,0,0}, BOX_COLLIDER);
+        AddComponent(g_enemies[i], NavigationComponent, DuplicateNavigationMesh(g_navigation), { 0 });
+
+        // each ghost gets its own audio stream + dsp + spatial
+        Music ghost_music = LoadMusicStream("resources/sounds/ghost.mp3");
+        ghost_music.looping = true;
+        DSPState* dsp = DSPInit(ghost_music.stream.sampleRate, 2.0f);
+        SpatialSource* spatial = SpatialCreateSource();
+        AddComponent(g_enemies[i], AudioSourceComponent, ghost_music, dsp, spatial);
+
+        g_audio_dsps[i] = dsp;
+        g_audio_spatials[i] = spatial;
+        AttachAudioStreamProcessor(ghost_music.stream, callbacks[i]);
+        PlayMusicStream(ghost_music);
+        SeekMusicStream(ghost_music, i * 1.7f); // offset so they don't sync up
+
+        BehaviorNode* follow_sequence[] = {
+            BehaviorAction(UpdateEnemyPath, &g_enemies[i]),
+            BehaviorAction(FollowEnemyPath, &g_enemies[i])
+        };
+        BehaviorNode* root = BehaviorSequence(follow_sequence, 2);
+        BlackBoard emptybb = { 0 };
+        BlackBoardSetBool(&emptybb, "Reset", TRUE);
+        BlackBoardSetInt(&emptybb, "Index", 0);
+        BlackBoardSetInt(&emptybb, "Count", 0);
+        AddComponent(g_enemies[i], AIComponent, emptybb, root);
+    }
 
     return scene;
 }
@@ -276,6 +335,12 @@ void UpdateTitleScene(World* world, float dt) {
 
 void CleanTitleScene(World* world) {
     UnloadTexture(g_title_texture);
+}
+void CleanGameOverScene(World* world) {
+    UnloadTexture(g_retry_texture);
+}
+void CleanEndScene(World* world) {
+    UnloadTexture(g_end_texture);
 }
 
 Scene* GenerateTitleScene() {
@@ -290,6 +355,44 @@ Scene* GenerateTitleScene() {
     return scene;
 }
 
+void UpdateGameOverScene(World* world, float dt) {
+    if (IsKeyPressed(KEY_P)) {
+        ResetGame();
+        SetScene("Main");
+    }
+}
+
+Scene* GenerateGameOverScene() {
+    Scene* scene = GenerateScene("GameOver");
+    World* world = GenerateWorld(NULL, UpdateGameOverScene, NULL, NULL, NULL, NULL, CleanGameOverScene);
+    AddWorld(scene, world);
+    AddSystem(world, GenerateDrawSystem());
+    g_retry_texture = LoadTexture("resources/images/death.png");
+    Entity e = CreateEntityP(world, 800, 450, 0);
+    *(EntityScale(e)) = (Vector3){ 1600, 900, 0 };
+    AddComponent(e, ImageComponent, g_retry_texture);
+    return scene;
+}
+
+void UpdateEndScene(World* world, float dt) {
+    if (IsKeyPressed(KEY_P)) {
+        ResetGame();
+        SetScene("Main");
+    }
+}
+
+Scene* GenerateEndScene() {
+    Scene* scene = GenerateScene("End");
+    World* world = GenerateWorld(NULL, UpdateGameOverScene, NULL, NULL, NULL, NULL, CleanEndScene);
+    AddWorld(scene, world);
+    AddSystem(world, GenerateDrawSystem());
+    g_end_texture = LoadTexture("resources/images/end.png");
+    Entity e = CreateEntityP(world, 800, 450, 0);
+    *(EntityScale(e)) = (Vector3){ 1600, 900, 0 };
+    AddComponent(e, ImageComponent, g_end_texture);
+    return scene;
+}
+
 void EchoMain() {
     SubmitExternalShader("build/expanded/audioviz.comp", "build/shaders/audioviz.comp.spv", NUMRAYS);
     SubmitExternalShader("build/expanded/vizfilter.comp", "build/shaders/vizfilter.comp.spv", OVERRIDE_W*OVERRIDE_H);
@@ -298,6 +401,8 @@ void EchoMain() {
     InitializeApplication("Echo Example", "See you, Space Cowboy", FALSE);
     AddScene(GenerateMainScene());
     AddScene(GenerateTitleScene());
+    AddScene(GenerateGameOverScene());
+    AddScene(GenerateEndScene());
     SetScene("Title");
     RunApplication();
     DestroyApplication();
