@@ -4,6 +4,9 @@
 #include "game/scene.h"
 #include <ui/ui.h>
 
+#define OVERRIDE_W 600
+#define OVERRIDE_H 338
+
 DECLARE_HASHMAP(int, BOOL, KeyMap);
 
 typedef struct {
@@ -20,7 +23,7 @@ typedef struct {
     #endif
 } Application;
 
-void InitializeApplication(const char* name, const char* goodbye);
+void InitializeApplication(const char* name, const char* goodbye, BOOL dev);
 
 void DestroyApplication();
 

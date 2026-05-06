@@ -15,12 +15,18 @@ if NOT exist "cache\" (
 if NOT exist "expanded\" (
     mkdir expanded
 )
+if NOT exist "extended\" (
+    mkdir extended
+)
 cd cache
 if NOT exist "shaders\" (
     mkdir shaders
 )
 cd ..
 cd ..
+
+:: add steam audio
+copy /Y "vendor\steamaudio\lib\windows-x64\phonon.dll" "build\" >nul
 
 :: download prism if not exist yet
 if NOT exist "prism\src\" (
@@ -44,8 +50,12 @@ if "%1"=="-u" (
     cd ..
 )
 
+:: copy to extended
+xcopy "prism\shaders\*" "build\extended\" /E /I /Q /Y >nul 2>&1
+xcopy "shaders\*" "build\extended\" /E /I /Q /Y >nul 2>&1
+
 :: expand shaders
-"./build/simp_windows.exe" prism/shaders build/expanded
+"./build/simp_windows.exe" build/extended build/expanded
 
 :: set up running env
 if NOT exist "penv" (
@@ -55,9 +65,15 @@ if NOT exist "penv" (
     cd "penv"
     mkdir "build"
     cd build
+    mkdir "shaders"
     xcopy ..\..\build\expanded expanded /E /I /Q >nul 2>&1
     cd ..
     cd ..
+)
+
+:: add steam audio
+if exist "penv" (
+    copy /Y "vendor\steamaudio\lib\windows-x64\phonon.dll" "penv\" >nul
 )
 
 :: compile shaders

@@ -1,0 +1,26 @@
+#import Boilerplate
+
+layout(binding = 0) #import UniformBufferObjectDef ubo;
+layout(binding = 1, rgba8) #import OutputImageDef;
+
+void main() {
+	int rx = int(gl_GlobalInvocationID.x%int(ubo.width));
+    int ry = int(gl_GlobalInvocationID.x/int(ubo.width));
+    vec4 color = imageLoad(outputImage, ivec2(rx, ry));
+    if (color.a < 1.0) return;
+    int radius = 1;
+    for (int x = -radius; x <= radius; x++) {
+        for (int y = -radius; y <= radius; y++) {
+            int _x = rx + x;
+            int _y = ry + y;
+            if (_x < 0 || _x >= ubo.width ||
+                _y < 0 || _y >= ubo.height) continue;
+            vec4 nc = imageLoad(outputImage, ivec2(_x, _y));
+            if (nc.a < 1.0) {
+                color.a = nc.a;
+                imageStore(outputImage, ivec2(rx, ry), color);
+                return;
+            }
+        }
+    }
+}

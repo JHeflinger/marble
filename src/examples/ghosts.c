@@ -6,15 +6,16 @@
 #include "util/navigation.h"
 #include "ecs/components.h"
 #include "ecs/entity.h"
+#include "data/boxloader.h"
 #include <renderer/renderer.h>
 #include <raymath.h>
 
-NavigationMesh g_navigation;
-Entity g_maze;
-Entity g_floor;
-Entity g_pacman;
-Entity g_ghost;
-BOOL g_start = FALSE;
+static NavigationMesh g_navigation;
+static Entity g_maze;
+static Entity g_floor;
+static Entity g_pacman;
+static Entity g_ghost;
+static BOOL g_start = FALSE;
 
 AIStatus UpdateGhostPath(void* ctx, BlackBoard* blackboard) {
     if (IsKeyPressed(KEY_S)) {
@@ -22,6 +23,8 @@ AIStatus UpdateGhostPath(void* ctx, BlackBoard* blackboard) {
         BlackBoardSetBool(blackboard, "Reset", TRUE);
     }
     if (!g_start) return AI_FAILURE;
+    BlackBoardSetInt(blackboard, "Count", BlackBoardGetInt(blackboard, "Count") + 1);
+    if (g_start && BlackBoardGetInt(blackboard, "Count")%120 == 0) BlackBoardSetBool(blackboard, "Reset", TRUE);
     BOOL reset = BlackBoardGetBool(blackboard, "Reset");
     if (reset) {
         BlackBoardSetInt(blackboard, "Index", 0);
@@ -41,15 +44,44 @@ AIStatus FollowGhostPath(void* ctx, BlackBoard* blackboard) {
     float ghost_speed = 10.0f;
     int index = BlackBoardGetInt(blackboard, "Index");
     NavigationComponent* nc = GetComponent(g_ghost, NavigationComponent);
-    Vector3 centroid = TriangleCentroid(nc->mesh.start + nc->path.data[index]);
-    Vector2 diffxz = (Vector2){ centroid.x - EntityPosition(g_ghost)->x, centroid.z - EntityPosition(g_ghost)->z };
-    float len = Vector2Length(diffxz);
-    diffxz = Vector2Normalize(diffxz);
-    EntityPosition(g_ghost)->x += diffxz.x * ghost_speed * GetFrameTime();
-    EntityPosition(g_ghost)->z += diffxz.y * ghost_speed * GetFrameTime();
-    if (len < 0.01f * ghost_speed) {
-        if ((size_t)index + 1 >= nc->path.size) index--;
-        BlackBoardSetInt(blackboard, "Index", index + 1);
+    int path_size = (int)nc->path.size;
+    if (index >= path_size) return AI_SUCCESS;
+    BOOL at_last = (index + 1 >= path_size);
+    Vector3 steering_target;
+    if (at_last) {
+        steering_target = nc->mesh.polys[nc->path.data[index]].centroid;
+    } else {
+        Vector3 ep1, ep2;
+        if (!GetSharedEdge(nc, index, &ep1, &ep2)) {
+            BlackBoardSetInt(blackboard, "Index", index + 1);
+            return AI_RUNNING;
+        }
+        steering_target = (Vector3){
+            (ep1.x + ep2.x) * 0.5f,
+            (ep1.y + ep2.y) * 0.5f,
+            (ep1.z + ep2.z) * 0.5f
+        };
+    }
+    Vector3* ghost_pos = EntityPosition(g_ghost);
+    float dx = steering_target.x - ghost_pos->x;
+    float dz = steering_target.z - ghost_pos->z;
+    float len = sqrtf(dx * dx + dz * dz);
+    if (len > 0.001f) {
+        ghost_pos->x += (dx / len) * ghost_speed * GetFrameTime();
+        ghost_pos->z += (dz / len) * ghost_speed * GetFrameTime();
+    }
+    if (at_last) {
+        if (len < 0.3f) {
+            BlackBoardSetInt(blackboard, "Index", index + 1);
+            return AI_SUCCESS;
+        }
+    } else {
+        Vector3 ep1, ep2;
+        GetSharedEdge(nc, index, &ep1, &ep2);
+        Vector3 current_centroid = nc->mesh.polys[nc->path.data[index]].centroid;
+        if (HasCrossedEdge(*ghost_pos, ep1, ep2, current_centroid)) {
+            BlackBoardSetInt(blackboard, "Index", index + 1);
+        }
     }
     return AI_RUNNING;
 }
@@ -82,6 +114,9 @@ Scene* GenerateMazeScene() {
     AddComponent(CreateEntity(world), LightComponent, l4);
     AddComponent(CreateEntity(world), LightComponent, l5);
 
+    // collision
+    LoadBoxColliders(world, "resources/data/colliders.json");
+
     // navmesh
     g_floor = CreateEntity(world);
     AddComponent(g_floor, NavigationComponent, g_navigation, { 0 });
@@ -95,7 +130,9 @@ Scene* GenerateMazeScene() {
     g_ghost = CreateEntityP(world, -37.0f, 5.8f, 0.0f);
     AddComponent(g_ghost, MeshComponent, UploadGeometry("resources/models/ghost/ghost.obj"));
     AddComponent(g_ghost, NavigationComponent, DuplicateNavigationMesh(g_navigation), { 0 });
-
+    AddComponent(g_ghost, DynamicCollisionComponent, FALSE, {0,0,0}, CYLINDER_COLLIDER);
+    *(EntityScale(g_ghost)) = (Vector3){ 0.5f, 0.5f, 0.5f };
+    
     // ghost ai
     BehaviorNode* follow_sequence[] = {
         BehaviorAction(UpdateGhostPath, NULL),
@@ -105,13 +142,14 @@ Scene* GenerateMazeScene() {
     BlackBoard emptybb = { 0 };
     BlackBoardSetBool(&emptybb, "Reset", TRUE);
     BlackBoardSetInt(&emptybb, "Index", 0);
+    BlackBoardSetInt(&emptybb, "Count", 0);
     AddComponent(g_ghost, AIComponent, emptybb, root);
 
     return scene;
 }
 
 void GhostsMain() {
-    InitializeApplication("Ghosts Example", "See you, Space Cowboy");
+    InitializeApplication("Ghosts Example", "See you, Space Cowboy", TRUE);
     AddScene(GenerateMazeScene());
     SetScene("Maze");
     RunApplication();

@@ -4,6 +4,8 @@
 #include "util/geometry.h"
 #include "util/navigation.h"
 #include "util/ai.h"
+#include "audio/dsp.h"
+#include "audio/spatial.h"
 
 #define EXPOSE_COMPONENT(name) enum { name##_TYPE = __COUNTER__ }; struct name; typedef struct name name; struct name
 
@@ -35,6 +37,10 @@ typedef enum {
 
 EXPOSE_COMPONENT(TagComponent) {
     const char* tag;
+};
+
+EXPOSE_COMPONENT(ImageComponent) {
+    Texture2D texture;
 };
 
 EXPOSE_COMPONENT(TransformComponent) {
@@ -78,6 +84,26 @@ EXPOSE_COMPONENT(NavigationComponent) {
 EXPOSE_COMPONENT(AIComponent) {
     BlackBoard blackboard;
     BehaviorNode* root;
+};
+
+EXPOSE_COMPONENT(AudioBarrierComponent) {
+    size_t meshid;
+};
+
+EXPOSE_COMPONENT(AudioSourceComponent) {
+    Music music;
+    DSPState* dsp;
+    SpatialSource* spatial;
+};
+
+EXPOSE_COMPONENT(AudioListenerComponent) {
+    size_t fidelity;
+};
+
+EXPOSE_COMPONENT(CameraComponent) {
+    BOOL enabled;
+    Vector3 offset;
+    Vector3 rotation;
 };
 
 #endif

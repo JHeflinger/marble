@@ -119,6 +119,21 @@ void FindPath(NavigationMesh* mesh, Vector3 start, Vector3 end, ARRLIST_size_t* 
     for (size_t i = 0; i < mesh->polycount; i++) {
         Triangle* tref = TriangleReference(mesh->start + i);
         VertexID vs[] = { tref->a, tref->b, tref->c };
+        vec3 centroidv;
+        glm_vec3_add(VertexReference(tref->a), VertexReference(tref->b), centroidv);
+        glm_vec3_add(centroidv, VertexReference(tref->c), centroidv);
+        glm_vec3_scale(centroidv, 1.0f / 3.0f, centroidv);
+        Vector3 centroid = (Vector3){ centroidv[0], centroidv[1], centroidv[2] };
+        float csdist = Vector3Length(Vector3Subtract(start, centroid));
+        float cedist = Vector3Length(Vector3Subtract(end, centroid));
+        if (csdist < sdist) {
+            sdist = csdist;
+            s = i;
+        }
+        if (cedist < edist) {
+            edist = cedist;
+            e = i;
+        }
         for (size_t j = 0; j < 3; j++) {
             Vector3 v = (Vector3){ VertexReference(vs[j])[0], VertexReference(vs[j])[1], VertexReference(vs[j])[2] };
             float newsdist = Vector3Length(Vector3Subtract(start, v));
@@ -148,4 +163,42 @@ void Navigate(Entity e, Vector3 target) {
         *(EntityPosition(e)),
         target,
         &(nc->path));
+}
+
+BOOL GetSharedEdge(NavigationComponent* nc, int index, Vector3* out_p1, Vector3* out_p2) {
+    TriangleID tid_a = nc->mesh.start + nc->path.data[index];
+    TriangleID tid_b = nc->mesh.start + nc->path.data[index + 1];
+    Triangle* ta = TriangleReference(tid_a);
+    Triangle* tb = TriangleReference(tid_b);
+    uint32_t a_verts[3] = { ta->a, ta->b, ta->c };
+    uint32_t b_verts[3] = { tb->a, tb->b, tb->c };
+    Vector3 shared[2];
+    int found = 0;
+    for (int i = 0; i < 3 && found < 2; i++) {
+        float* pa = VertexReference(a_verts[i]);
+        for (int j = 0; j < 3; j++) {
+            float* pb = VertexReference(b_verts[j]);
+            if (fabsf(pa[0] - pb[0]) < 0.001f &&
+                fabsf(pa[2] - pb[2]) < 0.001f) {
+                shared[found++] = (Vector3){ pa[0], pa[1], pa[2] };
+                break;
+            }
+        }
+    }
+    if (found < 2) return FALSE;
+    *out_p1 = shared[0];
+    *out_p2 = shared[1];
+    return TRUE;
+}
+
+BOOL HasCrossedEdge(Vector3 pos, Vector3 ep1, Vector3 ep2, Vector3 from_centroid) {
+    float edge_dx = ep2.x - ep1.x;
+    float edge_dz = ep2.z - ep1.z;
+    float to_pos_x = pos.x - ep1.x;
+    float to_pos_z = pos.z - ep1.z;
+    float to_cent_x = from_centroid.x - ep1.x;
+    float to_cent_z = from_centroid.z - ep1.z;
+    float cross_pos = edge_dx * to_pos_z - edge_dz * to_pos_x;
+    float cross_cent = edge_dx * to_cent_z - edge_dz * to_cent_x;
+    return (cross_pos * cross_cent) <= 0.1f;
 }

@@ -3,10 +3,13 @@
 #include <renderer/rmath.h>
 #include <easylogger.h>
 
+#define MAX_RECURSIVE_DEPTH 100
 #define BVH_LIMIT 0.01f
+#define EPS 0.000001f
 
 IMPL_ARRLIST(NodeBVH);
 IMPL_ARRLIST(BVHBox);
+IMPL_ARRLIST(MetaTriangle);
 
 BOOL AABBOverlap(NodeBVH a, BVHBox b) {
     return
@@ -260,7 +263,70 @@ BVHBox EntityBox(Entity e) {
     return (BVHBox){ INLINEV3(worldmin), INLINEV3(worldmax), INLINEV3(worldcenter), (uint32_t)e.id };
 }
 
-void ReconstructBVH(ARRLIST_NodeBVH* bvh, ARRLIST_EntityID entities, World* context) {
+void ProcessAudioBarrier(ARRLIST_BVHBox* boxes, ARRLIST_MetaTriangle* meta, Entity e) {
+    if (!HasComponent(e, AudioBarrierComponent)) EZ_ERROR("Cannot construct audio bvh on entities without AudioBarrierComponents");
+    MeshDescriptor* md = MeshReference(GetComponent(e, AudioBarrierComponent)->meshid);
+    for (TriangleID tid = md->tstart; tid <= md->tend; tid++) {
+        Triangle* tref = TriangleReference(tid);
+        mat4 transform;
+        memcpy(transform, md->transform, sizeof(mat4));
+        MetaTriangle mt;
+        BVHBox bb;
+        glm_mat4_mulv3(transform, VertexReference(tref->a), 1.0f, mt.a);
+        glm_mat4_mulv3(transform, VertexReference(tref->b), 1.0f, mt.b);
+        glm_mat4_mulv3(transform, VertexReference(tref->c), 1.0f, mt.c);
+        glm_vec3_minv(mt.a, mt.b, bb.min);
+        glm_vec3_minv(bb.min, mt.c, bb.min);
+        glm_vec3_maxv(mt.a, mt.b, bb.max);
+        glm_vec3_maxv(bb.max, mt.c, bb.max);
+        glm_vec3_add(bb.min, bb.max, bb.centroid);
+        glm_vec3_scale(bb.centroid, 0.5f, bb.centroid);
+        bb.eid = meta->size;
+        mt.eid = e.id;
+        ARRLIST_BVHBox_add(boxes, bb);
+        ARRLIST_MetaTriangle_add(meta, mt);
+    }
+}
+
+BOOL AABBIntersect(AudioRay* ray, NodeBVH* node) {
+    vec3 dfrac = { 1.0f / ray->direction[0], 1.0f / ray->direction[1], 1.0f / ray->direction[2] };
+    vec3 mindif, maxdif;
+    glm_vec3_sub(node->min, ray->position, mindif);
+    glm_vec3_mul(mindif, dfrac, mindif);
+    glm_vec3_sub(node->max, ray->position, maxdif);
+    glm_vec3_mul(maxdif, dfrac, maxdif);
+    float tmin = fmax(fmax(fmin(mindif[0], maxdif[0]), fmin(mindif[1], maxdif[1])), fmin(mindif[2], maxdif[2]));
+    float tmax = fmin(fmin(fmax(mindif[0], maxdif[0]), fmax(mindif[1], maxdif[1])), fmax(mindif[2], maxdif[2]));
+    return tmax >= 0 && tmin <= tmax;
+}
+
+BOOL TriangleIntersect(AudioRay* ray, MetaTriangle* triangle, AudioHit* hit) {
+    vec3 e1, e2, h, s, q, dn;
+    glm_vec3_sub(triangle->b, triangle->a, e1);
+    glm_vec3_sub(triangle->c, triangle->a, e2);
+    glm_vec3_cross(ray->direction, e2, h);
+    float a = glm_vec3_dot(e1, h);
+    if (fabs(a) < EPS) return FALSE;
+    float f = 1.0f / a;
+    glm_vec3_sub(ray->position, triangle->a, s);
+    float u = f * glm_vec3_dot(s, h);
+    if (u < 0.0f || u > 1.0f) return FALSE;
+    glm_vec3_cross(s, e1, q);
+    float v = f * glm_vec3_dot(ray->direction, q);
+    if (v < 0.0f || u + v > 1.0f) return FALSE;
+    hit->distance = f * glm_vec3_dot(e2, q);
+    if (hit->distance <= EPS) return FALSE;
+    hit->eid = (EntityID)triangle->eid;
+    glm_vec3_scale(ray->direction, hit->distance, hit->position);
+    glm_vec3_add(ray->position, hit->position, hit->position);
+    glm_vec3_cross(e1, e2, hit->normal);
+    glm_vec3_normalize(hit->normal);
+    glm_vec3_negate_to(ray->direction, dn);
+    if (glm_vec3_dot(hit->normal, dn) < 0.0f) glm_vec3_negate(hit->normal);
+    return TRUE;
+}
+
+void ReconstructCollisionBVH(ARRLIST_NodeBVH* bvh, ARRLIST_EntityID entities, World* context) {
     ARRLIST_NodeBVH_clear(bvh);
     ARRLIST_BVHBox geometry = { 0 };
     for (size_t i = 0; i < entities.size; i++) {
@@ -284,7 +350,7 @@ void ReconstructBVH(ARRLIST_NodeBVH* bvh, ARRLIST_EntityID entities, World* cont
     ARRLIST_BVHBox_clear(&geometry);
 }
 
-void QueryBVH(ARRLIST_NodeBVH* bvh, Entity e, DispatchBVHCollisionFunction dispatch) {
+void QueryCollisionBVH(ARRLIST_NodeBVH* bvh, Entity e, DispatchBVHCollisionFunction dispatch) {
     BVHBox box = EntityBox(e);
     uint32_t stack[128];
     uint32_t sp = 0;
@@ -326,4 +392,60 @@ void QueryBVH(ARRLIST_NodeBVH* bvh, Entity e, DispatchBVHCollisionFunction dispa
             }
         }
     }
+}
+
+void ReconstructAudioBVH(ARRLIST_MetaTriangle* meta, ARRLIST_NodeBVH* bvh, ARRLIST_EntityID entities, World* context) {
+    ARRLIST_NodeBVH_clear(bvh);
+    ARRLIST_MetaTriangle_clear(meta);
+    ARRLIST_BVHBox geometry = { 0 };
+    for (size_t i = 0; i < entities.size; i++) {
+        Entity e = (Entity){ entities.data[i], context };
+        ProcessAudioBarrier(&geometry, meta, e);
+    }
+    NodeBVH root = {
+        { FLT_MAX, FLT_MAX, FLT_MAX },
+        { -FLT_MAX, -FLT_MAX, -FLT_MAX },
+        BVH_LEAF, 0, 0
+    };
+    ARRLIST_size_t indices = { 0 };
+    for (size_t i = 0; i < geometry.size; i++) {
+        glm_vec3_minv(root.min, geometry.data[i].min, root.min);
+        glm_vec3_maxv(root.max, geometry.data[i].max, root.max);
+        ARRLIST_size_t_add(&indices, i);
+    }
+    ARRLIST_NodeBVH_add(bvh, root);
+    SplitBVH(bvh, 0, &geometry, &indices);
+    ARRLIST_size_t_clear(&indices);
+    ARRLIST_BVHBox_clear(&geometry);
+}
+
+AudioHit TraceAudioRay(AudioRay ray, ARRLIST_NodeBVH* bvh, ARRLIST_MetaTriangle* meta) {
+    AudioHit ah = { 0 };
+    ah.distance = -1.0f;
+    if (bvh->size == 0) return ah;
+    uint32_t stack[MAX_RECURSIVE_DEPTH] = { 0 };
+    int stack_ptr = 0;
+    stack[stack_ptr++] = 0;
+    while (stack_ptr > 0) {
+        uint32_t node_index = stack[--stack_ptr];
+        NodeBVH* node = &(bvh->data[node_index]);
+        if (stack_ptr >= MAX_RECURSIVE_DEPTH - 1) EZ_ERROR("Trace path stack overflow error");
+        if (node->branch_config == BVH_LEAF) {
+            AudioHit trihit;
+            if (TriangleIntersect(&ray, &(meta->data[node->left]), &trihit))
+                if (ah.distance == -1.0f || trihit.distance < ah.distance) ah = trihit;
+        } else if (node->branch_config == BVH_LEFT_ONLY) {
+            if (AABBIntersect(&ray, &(bvh->data[node->left])))
+                stack[stack_ptr++] = node->left;
+        } else if (node->branch_config == BVH_RIGHT_ONLY) {
+            if (AABBIntersect(&ray, &(bvh->data[node->right])))
+                stack[stack_ptr++] = node->right;
+        } else {
+            if (AABBIntersect(&ray, &(bvh->data[node->left])))
+                stack[stack_ptr++] = node->left;
+            if (AABBIntersect(&ray, &(bvh->data[node->right])))
+                stack[stack_ptr++] = node->right;
+        }
+    }
+    return ah;
 }

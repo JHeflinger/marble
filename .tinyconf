@@ -3,6 +3,8 @@ MAIN prism/src/main.c
 LIB prism/vendor/raylib/lib
 LIB prism/vendor/assimp/lib
 LIB prism/vendor/nfd/lib
+LINUX LIB vendor/steamaudio/lib/linux-x64
+WINDOWS LIB vendor/steamaudio/lib/windows-x64
 WINDOWS LIB prism/platform/windows/vulkan/libs
 WINDOWS LIB prism/platform/windows/GLFW
 INCLUDE prism/vendor/raylib/include
@@ -12,10 +14,13 @@ INCLUDE prism/vendor/EasyC/include
 INCLUDE prism/vendor/suitesparse/include
 INCLUDE prism/vendor/assimp/include
 INCLUDE prism/vendor/nfd/include
+INCLUDE vendor/steamaudio/include
+INCLUDE vendor/miniaudio
 WINDOWS INCLUDE prism/platform/windows/vulkan/include
 WINDOWS INCLUDE prism/platform/windows/GLFW/include
 LINK stdc++
 LINK z
+LINK phonon
 LINUX LINK :linux_libassimp.a
 LINUX LINK vulkan
 LINUX LINK glfw

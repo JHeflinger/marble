@@ -6,6 +6,16 @@
 #include <renderer/renderer.h>
 #include <raymath.h>
 
+void DrawImageComponent(Entity e, Vector2 origin) {
+    ImageComponent* ic = GetComponent(e, ImageComponent);
+    TransformComponent* tc = GetComponent(e, TransformComponent);
+    DrawTexturePro(
+        ic->texture,
+        (Rectangle){0, 0, ic->texture.width, ic->texture.height},
+        (Rectangle){tc->translation.x - tc->scale.x/2.0f, tc->translation.y - tc->scale.y/2.0f, tc->scale.x, tc->scale.y},
+        (Vector2){0, 0}, 0, WHITE);
+}
+
 void DrawTextComponent(Entity e, Vector2 origin) {
     TextComponent* tc = GetComponent(e, TextComponent);
     Font default_font = GetFontDefault();
@@ -62,7 +72,66 @@ void DrawTextComponent(Entity e, Vector2 origin) {
 }
 
 void DrawDrawSystem(System* system) {
+    ARRLIST_EntityID* cameras = GetEntities(system->context, CameraComponent);
+    SimpleCamera currcamera = GetCamera();
+    if (cameras) {
+        BOOL found = FALSE;
+        for (size_t i = 0; i < cameras->size; i++) {
+            Entity e = (Entity){ cameras->data[i], system->context };
+            CameraComponent* cc = GetComponent(e, CameraComponent);
+            TransformComponent* tc = GetComponent(e, TransformComponent);
+            if (cc->enabled) {
+                if (found) EZ_WARN("More than one camera component was detected to be enabled - any additional camers will override the previous one");
+                found = TRUE;
+                SimpleCamera sc = currcamera;
+                vec3 translation = { tc->translation.x, tc->translation.y, tc->translation.z };
+                vec3 rotation = { tc->rotation.x, tc->rotation.y, tc->rotation.z };
+                vec3 ctranslation = { cc->offset.x, cc->offset.y, cc->offset.z };
+                vec3 crotation = { cc->rotation.x, cc->rotation.y, cc->rotation.z };
+                glm_vec3_add(translation, ctranslation, translation);
+                glm_vec3_add(rotation, crotation, rotation);
+                mat4 R;
+                glm_euler_yxz(rotation, R);
+                vec3 forward = {0.0f, 0.0f, -1.0f};
+                vec3 up = {0.0f, 1.0f,  0.0f};
+                vec3 look, cam_up;
+                glm_mat4_mulv3(R, forward, 0.0f, look);
+                glm_mat4_mulv3(R, up, 0.0f, cam_up);
+                glm_vec3_copy(translation, sc.position);
+                glm_vec3_add(translation, look, look);
+                glm_vec3_copy(look, sc.look);
+                glm_vec3_copy(cam_up, sc.up);
+                MoveCamera(sc);
+            }
+        }
+    }
     RenderConfig()->reset = TRUE;
+    UpdateLights();
+    Render();
+    MoveCamera(currcamera);
+    RenderTexture2D target = GetViewportTarget();
+    Vector2 slice = GetViewportSlice();
+    BeginTextureMode(target);
+    Draw(0, 0, slice.x, slice.y);
+    Vector2 image_origin = (Vector2){ slice.x / 2.0f - target.texture.width / 2.0f, slice.y / 2.0f - target.texture.height / 2.0f };
+    ARRLIST_EntityID* image_entities = GetEntities(system->context, ImageComponent);
+    if (image_entities) {
+        for (size_t i = 0; i < image_entities->size; i++) {
+            Entity e = (Entity){ image_entities->data[i], system->context };
+            DrawImageComponent(e, image_origin);
+        }
+    }
+    ARRLIST_EntityID* text_entities = GetEntities(system->context, TextComponent);
+    if (text_entities) {
+        for (size_t i = 0; i < text_entities->size; i++) {
+            Entity e = (Entity){ text_entities->data[i], system->context };
+            DrawTextComponent(e, image_origin);
+        }
+    }
+    EndTextureMode();
+}
+
+void UpdateDrawSystem(System* system, float dt) {
     ARRLIST_EntityID* mesh_entities = GetEntities(system->context, MeshComponent);
     if (mesh_entities) {
         for (size_t i = 0 ; i < mesh_entities->size; i++) {
@@ -82,23 +151,8 @@ void DrawDrawSystem(System* system) {
             UpdateObjectTransform(mc->id);
         }
     }
-    UpdateLights();
-    Render();
-    RenderTexture2D target = GetViewportTarget();
-    Vector2 slice = GetViewportSlice();
-    BeginTextureMode(target);
-    Draw(0, 0, slice.x, slice.y);
-    Vector2 image_origin = (Vector2){ slice.x / 2.0f - target.texture.width / 2.0f, slice.y / 2.0f - target.texture.height / 2.0f };
-    ARRLIST_EntityID* text_entities = GetEntities(system->context, TextComponent);
-    if (text_entities) {
-        for (size_t i = 0; i < text_entities->size; i++) {
-            Entity e = (Entity){ text_entities->data[i], system->context };
-            DrawTextComponent(e, image_origin);
-        }
-    }
-    EndTextureMode();
 }
 
 System* GenerateDrawSystem() {
-    return GenerateSystem(DrawDrawSystem, NULL, NULL, NULL, NULL, NULL, NULL);
+    return GenerateSystem(DrawDrawSystem, UpdateDrawSystem, NULL, NULL, NULL, NULL, NULL);
 }

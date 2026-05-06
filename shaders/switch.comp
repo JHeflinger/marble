@@ -1,0 +1,25 @@
+#import Boilerplate
+
+layout(binding = 0) #import UniformBufferObjectDef ubo;
+layout(binding = 1, rgba8) #import OutputImageDef;
+
+void main() {
+	int rx = int(gl_GlobalInvocationID.x%int(ubo.width));
+    int ry = int(gl_GlobalInvocationID.x/int(ubo.width));
+    vec4 color = imageLoad(outputImage, ivec2(rx, ry));
+    if (color.a == 1.0) {
+        imageStore(outputImage, ivec2(rx, ry), vec4(color.xyz * 0.1, 1));
+    } else {
+        vec3 mask = vec3(1.5);
+        float mixy = 1.0;
+        if (color.a >= 0.1 - 0.002) {
+            mask = vec3(1.0);
+            mixy = (color.a - 0.1) / 0.1;
+        } else {
+            mask = vec3(1, 0.1, 0.1);
+            mixy = color.a / 0.1;
+        }
+        vec4 finalcolor = mix(vec4(color.xyz * 0.1, 1), vec4(color.xyz * mask, 1), mixy);
+        imageStore(outputImage, ivec2(rx, ry), finalcolor);
+    }
+}

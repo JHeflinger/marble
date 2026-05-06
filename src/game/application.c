@@ -139,8 +139,8 @@ void DrawApplication() {
 void InitializeEngineMaterials() {
     SubmitNamedMaterial((SurfaceMaterial){
         {0.0f, 0.0f, 0.0f},
-        {0.0f, 1.0f, 0.0f},
-        {0.0f, 1.0f, 0.0f},
+        {0.1f, 0.1f, 0.1f},
+        {0.6f, 0.3f, 0.0f},
         {0.0f, 0.0f, 0.0f},
         {0.0f, 0.0f, 0.0f},
         {0.0f, 0.0f, 0.0f},
@@ -157,11 +157,11 @@ void InitializeEngineMaterials() {
     }, "Attention");
 }
 
-void InitializeApplication(const char* name, const char* goodbye) {
+void InitializeApplication(const char* name, const char* goodbye, BOOL dev) {
     #ifndef PROD_BUILD
     g_application.memory = EZ_ALLOCATED();
     #endif
-    //OverrideResolution(400, 225);
+    OverrideResolution(OVERRIDE_W, OVERRIDE_H);
     g_application.name = name;
     g_application.goodbye = goodbye;
 	SetTraceLogLevel(LOG_NONE);
@@ -173,25 +173,30 @@ void InitializeApplication(const char* name, const char* goodbye) {
     InitializeRenderer();
     InitializeEngineMaterials();
     g_application.ui = GenerateUI();
-    g_application.ui->left = GenerateUI();
-    g_application.ui->right = GenerateUI();
-    ((UI*)g_application.ui->right)->right = GenerateUI();
-    ((UI*)g_application.ui->right)->left = GenerateUI();
-    ((UI*)g_application.ui->right)->divide = GetScreenHeight() - 560;
-    ((UI*)g_application.ui->right)->vertical = TRUE;
-    ((UI*)g_application.ui->left)->right = GenerateUI();
-    ((UI*)g_application.ui->left)->left = GenerateUI();
-    ((UI*)((UI*)g_application.ui->left)->left)->left = GenerateUI();
-    ((UI*)((UI*)g_application.ui->left)->left)->right = GenerateUI();
-    ((UI*)((UI*)g_application.ui->left)->left)->divide = GetScreenHeight() - 420;
-    ((UI*)((UI*)g_application.ui->left)->left)->vertical = TRUE;
-    ((UI*)g_application.ui->left)->divide = 350;
-    ARRLIST_Panel_add(&(((UI*)(((UI*)g_application.ui->right)->right))->panels), GenerateDiagnosticsPanel());
-    ARRLIST_Panel_add(&(((UI*)(((UI*)g_application.ui->right)->left))->panels), GenerateOverviewPanel());
-    ARRLIST_Panel_add(&(((UI*)(((UI*)g_application.ui->left)->right))->panels), GenerateEViewportPanel());
-    ARRLIST_Panel_add(&(GetLeftUI(GetLeftUI(GetLeftUI(g_application.ui)))->panels), GenerateEditPanel());
-    ARRLIST_Panel_add(&(GetRightUI(GetLeftUI(GetLeftUI(g_application.ui)))->panels), GenerateGraphPanel());
-    g_application.ui->divide = 1250;
+    if (dev) {
+        g_application.ui->left = GenerateUI();
+        g_application.ui->right = GenerateUI();
+        ((UI*)g_application.ui->right)->right = GenerateUI();
+        ((UI*)g_application.ui->right)->left = GenerateUI();
+        ((UI*)g_application.ui->right)->divide = GetScreenHeight() - 560;
+        ((UI*)g_application.ui->right)->vertical = TRUE;
+        ((UI*)g_application.ui->left)->right = GenerateUI();
+        ((UI*)g_application.ui->left)->left = GenerateUI();
+        ((UI*)((UI*)g_application.ui->left)->left)->left = GenerateUI();
+        ((UI*)((UI*)g_application.ui->left)->left)->right = GenerateUI();
+        ((UI*)((UI*)g_application.ui->left)->left)->divide = GetScreenHeight() - 420;
+        ((UI*)((UI*)g_application.ui->left)->left)->vertical = TRUE;
+        ((UI*)g_application.ui->left)->divide = 350;
+        ARRLIST_Panel_add(&(((UI*)(((UI*)g_application.ui->right)->right))->panels), GenerateDiagnosticsPanel());
+        ARRLIST_Panel_add(&(((UI*)(((UI*)g_application.ui->right)->left))->panels), GenerateOverviewPanel());
+        ARRLIST_Panel_add(&(((UI*)(((UI*)g_application.ui->left)->right))->panels), GenerateEViewportPanel());
+        ARRLIST_Panel_add(&(GetLeftUI(GetLeftUI(GetLeftUI(g_application.ui)))->panels), GenerateEditPanel());
+        ARRLIST_Panel_add(&(GetRightUI(GetLeftUI(GetLeftUI(g_application.ui)))->panels), GenerateGraphPanel());
+        g_application.ui->divide = 1250;
+    } else {
+        ARRLIST_Panel_add(&(g_application.ui->panels), GenerateEViewportPanel());
+        SetPipelineFlags(PATHTRACE_PIPELINE_FLAGS);
+    }
     SetPrimaryUI(g_application.ui);
     DevInitialize();
 }
@@ -207,7 +212,7 @@ void DestroyApplication() {
     for (size_t i = 0; i < g_application.scenes.size; i++) DestroyScene(g_application.scenes.data[i]);
     ARRLIST_ScenePtr_clear(&g_application.scenes);
     #ifndef PROD_BUILD
-    EZ_ASSERT(g_application.memory == EZ_ALLOCATED(), "Memory cleanup revealed a leak of %d bytes", (int)(EZ_ALLOCATED() - g_application.memory));
+    EZ_ASSERT(EZ_ALLOCATED() == 0, "Memory cleanup revealed a leak of %d bytes", (int)(EZ_ALLOCATED() - g_application.memory));
     #endif
     EZ_INFO("%s", g_application.goodbye);
 }

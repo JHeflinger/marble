@@ -32,10 +32,34 @@ typedef struct {
 } BVHBox;
 DECLARE_ARRLIST(BVHBox);
 
+typedef struct {
+    vec3 a;
+    vec3 b;
+    vec3 c;
+    uint32_t eid;
+} MetaTriangle;
+DECLARE_ARRLIST(MetaTriangle);
+
+typedef struct {
+    alignas(16) vec3 position;
+    alignas(16) vec3 direction;
+} AudioRay;
+
+typedef struct {
+    float distance;
+    EntityID eid;
+    vec3 position;
+    vec3 normal;
+} AudioHit;
+
 BVHBox EntityBox(Entity e);
 
-void ReconstructBVH(ARRLIST_NodeBVH* bvh, ARRLIST_EntityID entities, World* context);
+void ReconstructCollisionBVH(ARRLIST_NodeBVH* bvh, ARRLIST_EntityID entities, World* context);
 
-void QueryBVH(ARRLIST_NodeBVH* bvh, Entity e, DispatchBVHCollisionFunction dispatch);
+void QueryCollisionBVH(ARRLIST_NodeBVH* bvh, Entity e, DispatchBVHCollisionFunction dispatch);
+
+void ReconstructAudioBVH(ARRLIST_MetaTriangle* meta, ARRLIST_NodeBVH* bvh, ARRLIST_EntityID entities, World* context);
+
+AudioHit TraceAudioRay(AudioRay ray, ARRLIST_NodeBVH* bvh, ARRLIST_MetaTriangle* meta);
 
 #endif
