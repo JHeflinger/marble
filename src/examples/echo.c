@@ -34,7 +34,7 @@ typedef struct {
     alignas(4) float fade;
 } AuthoredRay;
 
-static Vector3 g_player_start = { -30.0f, 5.5f, 0.0f };
+static Vector3 g_player_start = { 37.0f, 5.5f, 0.0f};
 
 static Entity g_enemies[NUM_GHOSTS];
 static Vector3 g_enemy_starts[NUM_GHOSTS] = {
